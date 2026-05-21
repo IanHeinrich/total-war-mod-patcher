@@ -1,0 +1,34 @@
+# Legacy directories (from before restructure)
+extracted_data/
+compare_extract/
+temp_extract_gifts/
+
+# Legacy cache/data files (now stored in %LOCALAPPDATA%/tw-patcher/)
+.workshop_cache.json
+.workshop_thumbs/
+.game_art/
+
+# Pack files in project root (output artifacts)
+*.pack
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+dist/
+build/
+
+# Virtual environment
+.venv/
+venv/
+ENV/
+
+# IDE
+.idea/
+*.swp
+*.swo
+
+# OS
+Thumbs.db
+.DS_Store

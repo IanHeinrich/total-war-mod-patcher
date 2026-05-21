@@ -1,0 +1,10 @@
+[Desktop Entry]
+Type=Application
+Name=TW Mod Patcher
+Comment=Extract, compare, and repack Total War mod pack files
+Exec=tw-patcher ui
+Icon=tw-patcher
+Terminal=false
+Categories=Game;Utility;
+Keywords=total;war;mod;patcher;
+StartupNotify=true

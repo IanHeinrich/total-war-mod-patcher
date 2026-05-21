@@ -1,0 +1,164 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+env:
+  PYTHON_VERSION: "3.12"
+
+jobs:
+  build:
+    strategy:
+      matrix:
+        include:
+          - os: windows-latest
+            platform: windows
+            artifact: tw-patcher-windows-setup.exe
+          - os: macos-latest
+            platform: macos
+            artifact: tw-patcher-macos.dmg
+          - os: ubuntu-latest
+            platform: linux
+            artifact: tw-patcher-linux-x86_64.AppImage
+
+    runs-on: ${{ matrix.os }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: pip
+
+      - name: Get version from tag
+        id: version
+        shell: bash
+        run: echo "version=${GITHUB_REF_NAME#v}" >> "$GITHUB_OUTPUT"
+
+      - name: Install dependencies
+        run: pip install -e ".[build]"
+
+      # --- Platform-specific build steps ---
+
+      # Windows
+      - name: Build with PyInstaller (Windows)
+        if: matrix.platform == 'windows'
+        run: pyinstaller tw-patcher.spec --noconfirm
+
+      - name: Build NSIS installer (Windows)
+        if: matrix.platform == 'windows'
+        uses: joncloud/makensis-action@v4
+        with:
+          script-file: installer/windows/installer.nsi
+          arguments: /DPRODUCT_VERSION=${{ steps.version.outputs.version }}
+
+      - name: Move Windows installer
+        if: matrix.platform == 'windows'
+        shell: bash
+        run: |
+          mv installer/windows/tw-patcher-${{ steps.version.outputs.version }}-setup.exe \
+             dist/tw-patcher-${{ steps.version.outputs.version }}-windows-setup.exe
+
+      - name: Upload Windows artifact
+        if: matrix.platform == 'windows'
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-installer
+          path: dist/tw-patcher-${{ steps.version.outputs.version }}-windows-setup.exe
+
+      # macOS
+      - name: Generate .icns icon (macOS)
+        if: matrix.platform == 'macos'
+        run: |
+          mkdir -p build/icon.iconset
+          sips -z 16 16     icons/icon.png --out build/icon.iconset/icon_16x16.png
+          sips -z 32 32     icons/icon.png --out build/icon.iconset/icon_16x16@2x.png
+          sips -z 32 32     icons/icon.png --out build/icon.iconset/icon_32x32.png
+          sips -z 64 64     icons/icon.png --out build/icon.iconset/icon_32x32@2x.png
+          sips -z 128 128   icons/icon.png --out build/icon.iconset/icon_128x128.png
+          sips -z 256 256   icons/icon.png --out build/icon.iconset/icon_128x128@2x.png
+          sips -z 256 256   icons/icon.png --out build/icon.iconset/icon_256x256.png
+          sips -z 512 512   icons/icon.png --out build/icon.iconset/icon_256x256@2x.png
+          cp icons/icon.png build/icon.iconset/icon_512x512.png
+          iconutil -c icns build/icon.iconset -o icons/icon.icns
+
+      - name: Build with PyInstaller (macOS)
+        if: matrix.platform == 'macos'
+        run: pyinstaller tw-patcher.spec --noconfirm
+
+      - name: Install create-dmg (macOS)
+        if: matrix.platform == 'macos'
+        run: brew install create-dmg
+
+      - name: Build DMG (macOS)
+        if: matrix.platform == 'macos'
+        run: |
+          chmod +x installer/macos/build_dmg.sh
+          ./installer/macos/build_dmg.sh ${{ steps.version.outputs.version }}
+
+      - name: Upload macOS artifact
+        if: matrix.platform == 'macos'
+        uses: actions/upload-artifact@v4
+        with:
+          name: macos-dmg
+          path: dist/tw-patcher-${{ steps.version.outputs.version }}-macos.dmg
+
+      # Linux
+      - name: Install Linux dependencies
+        if: matrix.platform == 'linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libfuse2 libxcb-cursor0
+
+      - name: Build with PyInstaller (Linux)
+        if: matrix.platform == 'linux'
+        run: pyinstaller tw-patcher.spec --noconfirm
+
+      - name: Build AppImage (Linux)
+        if: matrix.platform == 'linux'
+        run: |
+          chmod +x installer/linux/build_appimage.sh
+          ./installer/linux/build_appimage.sh ${{ steps.version.outputs.version }}
+
+      - name: Upload Linux artifact
+        if: matrix.platform == 'linux'
+        uses: actions/upload-artifact@v4
+        with:
+          name: linux-appimage
+          path: dist/tw-patcher-${{ steps.version.outputs.version }}-x86_64.AppImage
+
+  release:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Get version from tag
+        id: version
+        shell: bash
+        run: echo "version=${GITHUB_REF_NAME#v}" >> "$GITHUB_OUTPUT"
+
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          name: "TW Mod Patcher v${{ steps.version.outputs.version }}"
+          draft: false
+          prerelease: ${{ contains(github.ref_name, 'rc') || contains(github.ref_name, 'beta') || contains(github.ref_name, 'alpha') }}
+          generate_release_notes: true
+          files: |
+            artifacts/windows-installer/*
+            artifacts/macos-dmg/*
+            artifacts/linux-appimage/*
