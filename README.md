@@ -14,13 +14,22 @@ Pharaoh Dynasties, Pharaoh, **Warhammer 3**, Troy, Three Kingdoms, Warhammer 2, 
 
 The tool auto-detects games installed via Steam. You can also manually point it at any game folder.
 
+## Download
+
+Grab the latest installer from the [Releases](https://github.com/IanHeinrich/total-war-mod-patcher/releases/latest) page:
+
+- **Windows** — `tw-patcher-x.x.x-windows-setup.exe`
+- **macOS** — `tw-patcher-x.x.x-macos.dmg`
+- **Linux** — `tw-patcher-x.x.x-x86_64.AppImage`
+
 ## Prerequisites
 
 - [RPFM](https://github.com/Frodo45127/rpfm/releases) installed (provides the server backend)
-- Python 3.10+
 - One or more `.pack` files to work with
 
-## Installation
+## Installation from source (optional)
+
+If you prefer to run from source instead of the installer:
 
 ```bash
 pip install -e .
@@ -155,10 +164,9 @@ See `modding_docs/` for reference documentation on TSV format, schemas, and work
 
 ## Requirements
 
-- Python 3.10+
 - RPFM ([github.com/Frodo45127/rpfm](https://github.com/Frodo45127/rpfm))
 - Windows, Linux, or macOS
-- Dependencies: `websockets`, `click`, `PyQt6`
+- (Source only) Python 3.10+ and dependencies: `websockets`, `click`, `PyQt6`
 
 ## Development
 
@@ -166,6 +174,6 @@ See [DEVELOPMENT.md](DEVELOPMENT.md) for codebase structure, architecture, and c
 
 ## Acknowledgements
 
-This tool is a thin automation layer on top of [RPFM](https://github.com/Frodo45127/rpfm) by Frodo45127. RPFM does all the heavy lifting — decoding CA's proprietary pack format, maintaining schemas for every game patch, handling binary↔TSV conversion, and exposing a WebSocket server for programmatic access.
+This tool is an automation layer on top of [RPFM](https://github.com/Frodo45127/rpfm). RPFM does all the heavy lifting: decoding CA's proprietary pack format, maintaining schemas for every game patch, handling binary↔TSV conversion, and exposing a WebSocket server for programmatic access.
 
-Without RPFM and the tremendous amount of work behind it, none of this would exist. If you find this tool useful, the credit belongs to the RPFM team.
+Without RPFM and the tremendous amount of work behind it, none of this would exist. If you find this tool useful, the credit belongs to the RPFM contributors.

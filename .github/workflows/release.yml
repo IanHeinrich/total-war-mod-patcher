@@ -48,16 +48,18 @@ jobs:
       # --- Platform-specific build steps ---
 
       # Windows
+      - name: Install NSIS (Windows)
+        if: matrix.platform == 'windows'
+        run: choco install nsis -y
+
       - name: Build with PyInstaller (Windows)
         if: matrix.platform == 'windows'
         run: pyinstaller tw-patcher.spec --noconfirm
 
       - name: Build NSIS installer (Windows)
         if: matrix.platform == 'windows'
-        uses: joncloud/makensis-action@v4
-        with:
-          script-file: installer/windows/installer.nsi
-          arguments: /DPRODUCT_VERSION=${{ steps.version.outputs.version }}
+        run: |
+          & "C:\Program Files (x86)\NSIS\makensis.exe" /DPRODUCT_VERSION=${{ steps.version.outputs.version }} installer\windows\installer.nsi
 
       - name: Move Windows installer
         if: matrix.platform == 'windows'
