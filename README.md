@@ -27,13 +27,58 @@ Grab the latest installer from the [Releases](https://github.com/IanHeinrich/tot
 - [RPFM](https://github.com/Frodo45127/rpfm/releases) installed (provides the server backend)
 - One or more `.pack` files to work with
 
-## Installation from source (optional)
+## Running from source
 
-If you prefer to run from source instead of the installer:
+Running from source avoids the Windows SmartScreen warning that appears when downloading an unsigned installer from GitHub.
+
+### Prerequisites
+
+- **Python 3.10 or later** — [python.org/downloads](https://www.python.org/downloads/)
+- **Git** — [git-scm.com](https://git-scm.com/)
+- **RPFM** — [github.com/Frodo45127/rpfm/releases](https://github.com/Frodo45127/rpfm/releases)
+
+### Setup
+
+**1. Clone the repository**
+
+```bash
+git clone https://github.com/IanHeinrich/total-war-mod-patcher.git
+cd total-war-mod-patcher
+```
+
+**2. Create and activate a virtual environment**
+
+Windows:
+```powershell
+python -m venv .venv
+.\.venv\Scripts\activate
+```
+
+macOS / Linux:
+```bash
+python3 -m venv .venv
+source .venv/bin/activate
+```
+
+**3. Install the package**
 
 ```bash
 pip install -e .
 ```
+
+### Running
+
+Launch the GUI:
+```bash
+tw-patcher ui
+```
+
+Or use the CLI:
+```bash
+tw-patcher --help
+```
+
+> You need to activate the virtual environment (step 2) each time you open a new terminal before running `tw-patcher`.
 
 ---
 
