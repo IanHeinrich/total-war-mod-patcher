@@ -152,6 +152,10 @@ class RichGroup(click.Group):
                 _rich.print(f"  Workspace: {settings.modding_root}")
             else:
                 _rich.print("  Workspace: [yellow]Not set[/yellow]")
+            if settings.rpfm_path:
+                _rich.print(f"  RPFM:      {settings.rpfm_path}")
+            else:
+                _rich.print("  RPFM:      [yellow]Not set[/yellow] (use 'tw-patcher config set-rpfm <path>')")
             _rich.print()
 
 
