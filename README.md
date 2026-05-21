@@ -29,7 +29,7 @@ Grab the latest installer from the [Releases](https://github.com/IanHeinrich/tot
 
 ## Running from source
 
-Running from source avoids the Windows SmartScreen warning that appears when downloading an unsigned installer from GitHub.
+I haven't done the steps to get my build verified by windows, so if you don't trust it, then here are the steps to run it directly from the source code:
 
 ### Prerequisites
 
