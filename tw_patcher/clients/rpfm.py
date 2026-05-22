@@ -144,6 +144,13 @@ class RPFMClient:
     async def import_tsv(self, pack_handle: str, table_path: str, tsv_path: str) -> None:
         await self.send_command("ImportTSV", [pack_handle, table_path, tsv_path])
 
+    async def delete_packed_files(self, pack_handle: str, paths: list[str]) -> None:
+        container_paths = [{"File": p} for p in paths]
+        await self.send_command("DeletePackedFiles", [pack_handle, container_paths])
+
+    async def save_pack(self, pack_handle: str) -> None:
+        await self.send_command("SavePack", pack_handle)
+
     async def add_packed_file(self, pack_handle: str, source_path: str, dest_path: str) -> None:
         result = await self.send_command(
             "AddPackedFiles",

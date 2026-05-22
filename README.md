@@ -121,6 +121,27 @@ Options:
 - `--output-dir` — override output directory
 - `--workspace-dir` — override workspace directory
 
+### Replace a table inside an existing pack
+
+```bash
+tw-patcher replace-table -p path\to\mod.pack -t path\to\fixed_table.tsv
+```
+
+Swaps one or more DB tables inside a `.pack` file while keeping all other content (models, textures, scripts, other tables) intact. The internal table path is read from the TSV's metadata line, so the replacement file must correspond to a table already in the pack.
+
+Options:
+- `-t` / `--tsv` — replacement TSV file (repeatable for multiple tables)
+- `-o` / `--output` — write to a new file instead of editing the pack in-place
+
+Examples:
+```bash
+# Fix a single table in-place
+tw-patcher replace-table -p mod.pack -t fixed_table.tsv
+
+# Fix multiple tables, save to a new file
+tw-patcher replace-table -p mod.pack -t fix1.tsv -t fix2.tsv -o patched_mod.pack
+```
+
 ### Other commands
 
 ```bash

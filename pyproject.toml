@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "tw-mod-patcher"
-version = "0.3.0"
+version = "0.4.0"
 description = "Extract, compare, and repack Total War mod pack files"
 requires-python = ">=3.10"
 dependencies = [
