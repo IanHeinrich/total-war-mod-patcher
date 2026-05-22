@@ -78,6 +78,32 @@ and patch mod projects that will be repacked into .pack files.
 extract (mods → TSV) → compare in editor → create patch → repack (TSV → .pack)
 ```
 
+## CLI Commands
+
+| Command | Purpose |
+|---------|---------|
+| `tw-patcher extract -s mod.pack` | Extract .pack files to TSV for editing |
+| `tw-patcher repack --patch name` | Build a new .pack from workspace TSVs |
+| `tw-patcher replace-table -p mod.pack -t fix.tsv` | Swap individual tables inside an existing .pack |
+| `tw-patcher list` | Show available patch mods in workspace/ |
+| `tw-patcher check` | Verify RPFM server is running |
+| `tw-patcher clean` | Remove all files from sources/ and output/ |
+| `tw-patcher config show` | Display current settings |
+| `tw-patcher scaffold` | Generate modding docs and AI helper files |
+
+### replace-table (targeted fix)
+
+Swaps specific DB tables inside a .pack without touching other content (models, textures, scripts).
+Useful for fixing broken mods without a full repack.
+
+```bash
+tw-patcher replace-table -p mod.pack -t fixed_table.tsv              # edit in-place
+tw-patcher replace-table -p mod.pack -t fix.tsv -o output/mod.pack   # save copy
+tw-patcher replace-table -p mod.pack -t a.tsv -t b.tsv               # multiple tables
+```
+
+The TSV metadata line (line 2, starts with `#`) identifies which table to replace.
+
 ## TSV Rules (CRITICAL)
 
 - **Never** edit the `#` metadata header line (line 1)
@@ -156,10 +182,83 @@ Reference material for Total War modding with the TW Mod Patcher tool.
 3. **Patch** — Copy/edit tables into `workspace/<patch_name>/db/...`
 4. **Repack** — Build .pack file (`output/`)
 5. **Verify** — Load in RPFM or test in-game
+
+For targeted fixes to existing packs (e.g. fixing a broken mod without full repack):
+1. **Extract** — Unpack the mod to get the broken table as TSV
+2. **Fix** — Edit the TSV to correct the issue
+3. **Replace** — `tw-patcher replace-table -p mod.pack -t fixed.tsv -o output/mod.pack`
 """
 
 _DOCS_WORKFLOW = """\
 # Workflow: Creating a Patch Mod
+
+## Available Commands
+
+| Command | Purpose |
+|---------|---------|
+| `extract` | Extract .pack files to TSV for editing |
+| `repack` | Build a new .pack from workspace TSVs |
+| `replace-table` | Swap individual tables inside an existing .pack |
+| `list` | Show available patch mods in workspace/ |
+| `check` | Verify RPFM server is running |
+| `clean` | Remove all files from sources/ and output/ |
+| `config show` | Display current settings (game, paths) |
+| `config set-rpfm` | Set RPFM installation path |
+| `scaffold` | Generate modding docs and AI helper files |
+| `ui` | Launch the graphical interface |
+
+Global options: `--game` (select game, persisted), `--verbose` (debug logging)
+
+---
+
+## Command Details
+
+### extract — Unpack mods to TSV
+
+```bash
+tw-patcher extract -s path/to/mod1.pack -s path/to/mod2.pack
+```
+
+Options:
+- `-s` / `--source` — .pack file to extract (up to 6, repeatable)
+- `-o` / `--output` or `--sources-dir` — override output directory (default: `sources/`)
+
+### repack — Build a .pack from workspace TSVs
+
+```bash
+tw-patcher repack --patch my_patch
+```
+
+Options:
+- `-p` / `--patch` — name of the patch mod folder in workspace/ (required)
+- `-o` / `--output` — explicit output .pack path
+- `-n` / `--name` — custom filename (without .pack)
+- `--output-dir` — override output directory
+- `--workspace-dir` — override workspace directory
+
+### replace-table — Swap tables inside an existing .pack
+
+```bash
+tw-patcher replace-table -p mod.pack -t fixed_table.tsv
+```
+
+Replaces specific DB table(s) inside an existing .pack file while preserving all other
+content (models, textures, scripts, other tables). The internal table path is read from
+each TSV's metadata line (line 2), so the TSV must match a table already in the pack.
+
+Options:
+- `-p` / `--pack` — .pack file containing the table to replace (required)
+- `-t` / `--tsv` — replacement TSV file (required, repeatable for multiple tables)
+- `-o` / `--output` — save to a new file instead of editing in-place
+
+Use cases:
+- Fix a broken table in a mod without full repack (preserves assets)
+- Apply targeted patches to Workshop mods
+- Batch-fix multiple tables: `-t fix1.tsv -t fix2.tsv`
+
+**Warning**: Without `--output`, the pack is modified in-place.
+
+---
 
 ## Step 1: Extract Source Mods
 
