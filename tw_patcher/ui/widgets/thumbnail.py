@@ -7,6 +7,7 @@ from pathlib import Path
 from PyQt6.QtCore import QThread, pyqtSignal, QObject
 from PyQt6.QtGui import QPixmap
 
+from ...constants import THUMBNAIL_TIMEOUT
 from .workshop_mod import WorkshopModWidget
 
 
@@ -21,7 +22,7 @@ class _DownloadWorker(QThread):
     def run(self) -> None:
         try:
             req = urllib.request.Request(self._url)
-            with urllib.request.urlopen(req, timeout=10) as resp:
+            with urllib.request.urlopen(req, timeout=THUMBNAIL_TIMEOUT) as resp:
                 data = resp.read()
             self.downloaded.emit(self._wid, data)
         except (urllib.error.URLError, OSError):

@@ -17,13 +17,14 @@ from typing import Any, Optional
 import websockets
 from websockets import ClientConnection
 
+from ..constants import RPFM_DEFAULT_PORT, RPFM_DEFAULT_TIMEOUT, RPFM_WS_MAX_SIZE
 from ..exceptions import RPFMError
 
 logger = logging.getLogger(__name__)
 
 
 class RPFMClient:
-    def __init__(self, host: str = "127.0.0.1", port: int = 45127, timeout: int = 60):
+    def __init__(self, host: str = "127.0.0.1", port: int = RPFM_DEFAULT_PORT, timeout: int = RPFM_DEFAULT_TIMEOUT):
         self.host = host
         self.port = port
         self.timeout = timeout
@@ -36,7 +37,7 @@ class RPFMClient:
         try:
             logger.info(f"Connecting to RPFM server at {self.ws_url}...")
             self.connection = await asyncio.wait_for(
-                websockets.connect(self.ws_url, max_size=50 * 1024 * 1024),
+                websockets.connect(self.ws_url, max_size=RPFM_WS_MAX_SIZE),
                 timeout=self.timeout
             )
             raw = await asyncio.wait_for(self.connection.recv(), timeout=self.timeout)
@@ -175,7 +176,7 @@ class RPFMClient:
 
 
 class RPFMConnection:
-    def __init__(self, host: str = "127.0.0.1", port: int = 45127, timeout: int = 60):
+    def __init__(self, host: str = "127.0.0.1", port: int = RPFM_DEFAULT_PORT, timeout: int = RPFM_DEFAULT_TIMEOUT):
         self.client = RPFMClient(host, port, timeout)
 
     async def __aenter__(self) -> RPFMClient:

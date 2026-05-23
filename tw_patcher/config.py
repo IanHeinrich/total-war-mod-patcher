@@ -5,18 +5,25 @@ from pathlib import Path
 import platform
 import re
 
+from .constants import (
+    MAX_SOURCE_MODS,
+    RPFM_DEFAULT_PORT,
+    RPFM_DEFAULT_TIMEOUT,
+    RPFM_STARTUP_ATTEMPTS,
+    RPFM_STARTUP_WAIT,
+)
 from .models.game import GameDef, GAMES, get_game
 from .models.workshop import WorkshopMod
 
 
 @dataclass
 class Settings:
-    max_mods: int = 6
+    max_mods: int = MAX_SOURCE_MODS
     rpfm_host: str = "127.0.0.1"
-    rpfm_port: int = 45127
-    rpfm_timeout: int = 60
-    rpfm_startup_attempts: int = 10
-    rpfm_startup_wait_seconds: float = 1.0
+    rpfm_port: int = RPFM_DEFAULT_PORT
+    rpfm_timeout: int = RPFM_DEFAULT_TIMEOUT
+    rpfm_startup_attempts: int = RPFM_STARTUP_ATTEMPTS
+    rpfm_startup_wait_seconds: float = RPFM_STARTUP_WAIT
 
     selected_game: str | None = field(default=None)
     game_dirs: dict[str, Path] = field(default_factory=dict)

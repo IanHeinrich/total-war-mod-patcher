@@ -9,6 +9,7 @@ from typing import Optional
 from ..clients.rpfm import RPFMClient
 from ..config import Settings
 from ..console import console
+from ..constants import PORT_CHECK_TIMEOUT
 from ..exceptions import ConfigurationError
 
 
@@ -26,7 +27,7 @@ class SystemService:
     def _is_port_open(self) -> bool:
         try:
             with socket.create_connection(
-                (self.settings.rpfm_host, self.settings.rpfm_port), timeout=2
+                (self.settings.rpfm_host, self.settings.rpfm_port), timeout=PORT_CHECK_TIMEOUT
             ):
                 return True
         except OSError:

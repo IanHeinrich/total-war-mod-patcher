@@ -5,6 +5,7 @@ from pathlib import Path
 from PyQt6.QtCore import QThread, pyqtSignal
 from PyQt6.QtGui import QPixmap
 
+from ...constants import HTTP_TIMEOUT
 from ...models.game import GameDef
 
 
@@ -19,7 +20,7 @@ class ArtworkDownloadWorker(QThread):
     def run(self) -> None:
         try:
             req = urllib.request.Request(self._url)
-            with urllib.request.urlopen(req, timeout=15) as resp:
+            with urllib.request.urlopen(req, timeout=HTTP_TIMEOUT) as resp:
                 data = resp.read()
             self.downloaded.emit(self._game_key, data)
         except (urllib.error.URLError, OSError):

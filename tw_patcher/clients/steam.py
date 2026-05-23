@@ -8,6 +8,8 @@ from pathlib import Path
 from typing import TypedDict
 
 
+from ..constants import HTTP_TIMEOUT
+
 STEAM_API_URL = "https://api.steampowered.com/ISteamRemoteStorage/GetPublishedFileDetails/v1/"
 CACHE_TTL_SECONDS = 7 * 24 * 60 * 60  # 7 days
 BATCH_SIZE = 100
@@ -62,7 +64,7 @@ class SteamWorkshopClient:
                 data=form_data.encode("utf-8"),
                 headers={"Content-Type": "application/x-www-form-urlencoded"},
             )
-            with urllib.request.urlopen(req, timeout=15) as resp:
+            with urllib.request.urlopen(req, timeout=HTTP_TIMEOUT) as resp:
                 data = json.loads(resp.read().decode("utf-8"))
 
             now = time.time()

@@ -8,6 +8,8 @@ from PyQt6.QtCore import Qt, QSize, QThread, pyqtSignal, QObject
 from PyQt6.QtGui import QPixmap, QFont
 from PyQt6.QtWidgets import QWidget, QHBoxLayout, QVBoxLayout, QLabel, QCheckBox
 
+from ..constants import THUMBNAIL_TIMEOUT
+
 THUMB_SIZE = 64
 PLACEHOLDER_STYLE = "background-color: #3a3a3a; border: 1px solid #555;"
 
@@ -80,7 +82,7 @@ class _DownloadWorker(QThread):
     def run(self) -> None:
         try:
             req = urllib.request.Request(self._url)
-            with urllib.request.urlopen(req, timeout=10) as resp:
+            with urllib.request.urlopen(req, timeout=THUMBNAIL_TIMEOUT) as resp:
                 data = resp.read()
             self.downloaded.emit(self._wid, data)
         except (urllib.error.URLError, OSError):
