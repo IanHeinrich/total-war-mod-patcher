@@ -6,11 +6,25 @@ Architecture, codebase structure, and development details for TW Mod Patcher.
 
 ```
 tw_patcher/
-├── cli.py                    ← Click CLI entry point
 ├── config.py                 ← Settings dataclass (persistence, game detection)
 ├── console.py                ← Rich console output helpers
+├── constants.py              ← Named constants (ports, timeouts, limits)
 ├── exceptions.py             ← Custom exception hierarchy
-├── utils.py                  ← Path normalization for RPFM protocol
+├── cli/
+│   ├── __init__.py           ← Re-exports cli group (entry point: tw_patcher.cli:cli)
+│   ├── _rich.py              ← RichCommand/RichGroup (formatted help output)
+│   ├── _helpers.py           ← Shared CLI helpers (client/service factories)
+│   ├── main.py               ← Root @click.group definition + global options
+│   └── commands/
+│       ├── extract.py        ← extract command
+│       ├── repack.py         ← repack command
+│       ├── replace.py        ← replace-table command
+│       ├── list.py           ← list command
+│       ├── check.py          ← check command
+│       ├── clean.py          ← clean command
+│       ├── scaffold.py       ← scaffold command
+│       ├── ui.py             ← ui command (launches GUI)
+│       └── config.py         ← config subgroup (show, set-rpfm)
 ├── clients/
 │   ├── rpfm.py               ← WebSocket client for RPFM server
 │   └── steam.py              ← Steam Workshop API client
@@ -23,6 +37,8 @@ tw_patcher/
 │   ├── repacking.py          ← RepackingService (TSV → pack)
 │   ├── scaffold.py           ← Workspace scaffolding & docs generation
 │   └── system.py             ← SystemService (RPFM lifecycle management)
+├── utils/
+│   └── rpfm_utils.py         ← Path normalization for RPFM protocol
 └── ui/
     ├── app.py                ← QApplication launcher
     ├── main_window.py        ← MainWindow layout
@@ -56,7 +72,7 @@ The tool supports all 14 Total War games that RPFM handles. The game registry (`
 
 ### RPFM Communication
 
-RPFM exposes a WebSocket server on `localhost:45127`. The protocol is JSON-based:
+RPFM exposes a WebSocket server on `localhost:45127` (see `constants.py` for defaults). The protocol is JSON-based:
 - Request: `{"id": <u64>, "data": {"CommandName": [args]}}`
 - Response: `{"id": <u64>, "data": "Success" | {"Error": "..."} | {result}}`
 
@@ -137,5 +153,6 @@ If RPFM adds support for a new game:
 
 - **websockets** — async WebSocket client for RPFM protocol
 - **click** — CLI framework
+- **rich** — Terminal formatting (tables, panels, spinners)
 - **PyQt6** — GUI framework
 - **RPFM** (external) — provides the server that does actual pack file manipulation

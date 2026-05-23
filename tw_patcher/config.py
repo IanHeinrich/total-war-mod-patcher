@@ -166,7 +166,7 @@ class Settings:
                 continue
             packs = sorted(entry.glob("*.pack"))
             if packs:
-                mods.append(WorkshopMod(workshop_id=entry.name, pack_paths=packs))
+                mods.append(WorkshopMod(workshop_id=entry.name, pack_paths=packs)) # pyright: ignore[reportCallIssue]
         return mods
 
     def list_patch_mods(self) -> list[str]:
