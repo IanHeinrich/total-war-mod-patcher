@@ -17,6 +17,12 @@ class RepackingService:
     def find_tsv_files(self, input_dir: Path) -> list[Path]:
         return sorted(input_dir.glob("**/*.tsv"))
 
+    def find_script_files(self, input_dir: Path) -> list[Path]:
+        script_dir = input_dir / "script"
+        if not script_dir.exists():
+            return []
+        return sorted(f for f in script_dir.rglob("*") if f.is_file())
+
     async def repack(
         self,
         patch_name: str,
@@ -38,10 +44,12 @@ class RepackingService:
         resolved_output.parent.mkdir(parents=True, exist_ok=True)
 
         tsv_files = self.find_tsv_files(source_dir)
-        if not tsv_files:
-            raise ValueError(f"No TSV files found in {source_dir}")
+        script_files = self.find_script_files(source_dir)
 
-        console.info(f"Found {len(tsv_files)} TSV files to repack")
+        if not tsv_files and not script_files:
+            raise ValueError(f"No TSV or script files found in {source_dir}")
+
+        console.info(f"Found {len(tsv_files)} TSV files and {len(script_files)} script files to repack")
 
         with console.status("Creating pack file..."):
             if not self.settings.selected_game:
@@ -55,27 +63,46 @@ class RepackingService:
             output_path=resolved_output,
         )
 
-        with console.status("Importing tables..."):
-            for tsv_file in tsv_files:
-                relative_path = tsv_file.relative_to(source_dir)
-                table_path = to_rpfm_container_path(relative_path)
+        if tsv_files:
+            with console.status("Importing tables..."):
+                for tsv_file in tsv_files:
+                    relative_path = tsv_file.relative_to(source_dir)
+                    table_path = to_rpfm_container_path(relative_path)
 
-                try:
-                    await self.client.add_packed_file(
-                        pack_handle,
-                        normalize_rpfm_path(tsv_file),
-                        table_path,
-                    )
-                    result.tables_imported.append(table_path)
-                    console.info(f"Imported {table_path}")
-                except Exception as e:
-                    result.tables_failed.append((table_path, str(e)))
-                    console.error(f"Failed to import {table_path}: {e}")
+                    try:
+                        await self.client.add_packed_file(
+                            pack_handle,
+                            normalize_rpfm_path(tsv_file),
+                            table_path,
+                        )
+                        result.tables_imported.append(table_path)
+                        console.info(f"Imported {table_path}")
+                    except Exception as e:
+                        result.tables_failed.append((table_path, str(e)))
+                        console.error(f"Failed to import {table_path}: {e}")
+
+        if script_files:
+            with console.status("Importing scripts..."):
+                for script_file in script_files:
+                    relative_path = script_file.relative_to(source_dir)
+                    container_path = str(relative_path).replace('\\', '/')
+
+                    try:
+                        await self.client.add_packed_file(
+                            pack_handle,
+                            normalize_rpfm_path(script_file),
+                            container_path,
+                        )
+                        result.scripts_imported.append(container_path)
+                        console.info(f"Imported {container_path}")
+                    except Exception as e:
+                        result.scripts_failed.append((container_path, str(e)))
+                        console.error(f"Failed to import {container_path}: {e}")
 
         if result.success_count == 0:
             raise RepackError(
-                "No TSV files were successfully imported",
-                failed_tables=result.tables_failed,
+                "No files were successfully imported",
+                failed_tables=result.tables_failed + result.scripts_failed,
             )
 
         with console.status("Saving pack..."):

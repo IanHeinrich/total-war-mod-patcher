@@ -62,10 +62,14 @@ def extract(source: tuple[Path, ...], output: Path | None, sources_dir: Path | N
     try:
         results = asyncio.run(_run())
 
-        total = sum(r.success_count for r in results)
-        console.success(f"Extracted {len(source)} mod(s), {total} tables to: {target_dir}")
+        total_tables = sum(len(r.tables_exported) for r in results)
+        total_scripts = sum(len(r.scripts_extracted) for r in results)
+        console.success(
+            f"Extracted {len(source)} mod(s): {total_tables} tables, "
+            f"{total_scripts} scripts to: {target_dir}"
+        )
         console.header("\nNext steps:")
-        console.hint("1. Compare extracted tables in sources/")
+        console.hint("1. Compare extracted tables/scripts in sources/")
         console.hint("2. Create a patch mod: mkdir workspace\\<name>\\db")
         console.hint("3. Repack: tw-patcher repack --patch <name>")
 

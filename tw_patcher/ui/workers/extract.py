@@ -37,7 +37,11 @@ class ExtractWorker(QThread):
                     await client.disconnect()
 
             results = asyncio.run(_run())
-            total = sum(r.success_count for r in results)
-            self.finished.emit(True, f"Extracted {len(self.sources)} mod(s), {total} tables")
+            total_tables = sum(len(r.tables_exported) for r in results)
+            total_scripts = sum(len(r.scripts_extracted) for r in results)
+            self.finished.emit(
+                True,
+                f"Extracted {len(self.sources)} mod(s): {total_tables} tables, {total_scripts} scripts"
+            )
         except Exception as e:
             self.finished.emit(False, f"Extraction failed: {e}\n{traceback.format_exc()}")

@@ -38,7 +38,10 @@ class RepackWorker(QThread):
 
             result = asyncio.run(_run())
             self.finished.emit(
-                True, f"Repacked '{self.patch_name}': {result.success_count} tables -> {result.output_path}"
+                True,
+                f"Repacked '{self.patch_name}': "
+                f"{len(result.tables_imported)} tables, "
+                f"{len(result.scripts_imported)} scripts -> {result.output_path}"
             )
         except Exception as e:
             self.finished.emit(False, f"Repacking failed: {e}\n{traceback.format_exc()}")

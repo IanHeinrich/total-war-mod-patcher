@@ -90,7 +90,10 @@ def repack(patch: str, output: Path | None, name: str | None,
         result = asyncio.run(_run())
 
         console.success(f"Pack file created: {result.output_path}")
-        console.item(f"{result.success_count}/{result.total_count} tables imported")
+        console.item(
+            f"{len(result.tables_imported)} tables, "
+            f"{len(result.scripts_imported)} scripts imported"
+        )
 
     except Exception as e:
         console.error(f"Repacking failed: {e}")

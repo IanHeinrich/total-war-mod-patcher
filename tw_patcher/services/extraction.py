@@ -34,6 +34,9 @@ class ExtractionService:
         db_table_paths = await self.client.list_db_table_paths(pack_handle)
         console.info(f"Found {len(db_table_paths)} database tables")
 
+        script_paths = await self.client.list_script_paths(pack_handle)
+        console.info(f"Found {len(script_paths)} script files")
+
         result = ExtractionResult(mod_name=mod_name, output_dir=mod_output_dir)
 
         with console.status("Exporting tables..."):
@@ -52,9 +55,24 @@ class ExtractionService:
                     result.tables_failed.append((table_path, str(e)))
                     console.error(f"Failed to export {table_path}: {e}")
 
+        if script_paths:
+            with console.status("Extracting scripts..."):
+                try:
+                    await self.client.extract_packed_files(
+                        pack_handle, script_paths, normalize_rpfm_path(mod_output_dir)
+                    )
+                    result.scripts_extracted.extend(script_paths)
+                    for sp in script_paths:
+                        console.info(f"Extracted {sp}")
+                except Exception as e:
+                    for sp in script_paths:
+                        result.scripts_failed.append((sp, str(e)))
+                    console.error(f"Failed to extract scripts: {e}")
+
         await self.client.close_pack_file(pack_handle)
         console.info(
-            f"Extraction complete: {result.success_count}/{result.total_count} tables"
+            f"Extraction complete: {len(result.tables_exported)} tables, "
+            f"{len(result.scripts_extracted)} scripts"
         )
         return result
 
@@ -87,12 +105,14 @@ class ExtractionService:
 
         if total_failed > 0 and total_exported == 0:
             raise ExtractionError(
-                "All table exports failed",
+                "All exports failed",
                 failed_tables=[t for r in results for t in r.tables_failed],
             )
 
         self._write_readme(output_dir, results)
-        console.info(f"Extraction completed: {total_exported} tables total")
+        total_tables = sum(len(r.tables_exported) for r in results)
+        total_scripts = sum(len(r.scripts_extracted) for r in results)
+        console.info(f"Extraction completed: {total_tables} tables, {total_scripts} scripts")
         return results
 
     @staticmethod
@@ -111,7 +131,11 @@ class ExtractionService:
             f.write("Extracted Mod Data\n")
             f.write("==================\n\n")
             for result in results:
-                f.write(f"{result.mod_name}/: {result.success_count} tables\n")
+                f.write(
+                    f"{result.mod_name}/: "
+                    f"{len(result.tables_exported)} tables, "
+                    f"{len(result.scripts_extracted)} scripts\n"
+                )
             f.write("\nNext steps:\n")
             f.write("1. Compare tables across extracted mods\n")
             f.write("2. Create a patch mod: tw-patcher repack --patch <name>\n")

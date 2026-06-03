@@ -139,6 +139,22 @@ class RPFMClient:
             ]
         raise RPFMError(f"Unexpected response from GetPackFileDataForTreeView: {result}")
 
+    async def list_script_paths(self, pack_handle: str) -> list[str]:
+        result = await self.send_command("GetPackFileDataForTreeView", pack_handle)
+        if isinstance(result, dict) and "ContainerInfoVecRFileInfo" in result:
+            container_and_files: Any = result["ContainerInfoVecRFileInfo"]
+            _container_info, file_list = container_and_files
+            return [
+                f["path"] for f in file_list
+                if isinstance(f, dict) and f.get("path", "").startswith("script/")
+            ]
+        raise RPFMError(f"Unexpected response from GetPackFileDataForTreeView: {result}")
+
+    async def extract_packed_files(self, pack_handle: str, paths: list[str], dest_path: str) -> None:
+        container_paths = [{"File": p} for p in paths]
+        sources = {"PackFile": container_paths}
+        await self.send_command("ExtractPackedFiles", [pack_handle, sources, dest_path, False])
+
     async def export_tsv(self, pack_handle: str, table_path: str, output_path: str) -> None:
         await self.send_command("ExportTSV", [pack_handle, table_path, output_path, "PackFile"])
 
