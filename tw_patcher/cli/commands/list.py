@@ -23,7 +23,7 @@ def list_cmd(workspace_dir: Path | None) -> None:
 
     if not mods:
         console.warning(f"No patch mods found in {ws}")
-        console.hint("Create one: mkdir workspace\\my_patch\\db")
+        console.hint("Create one: tw-patcher new-patch my_patch")
         return
 
     console.header(f"Patch mods in {ws} ({len(mods)}):\n")

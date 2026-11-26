@@ -9,7 +9,6 @@ first frame at connect time and exposed as ``client.protocol``.
 import asyncio
 import json
 import logging
-import types
 import urllib.request
 from typing import Any
 
@@ -151,20 +150,3 @@ class RPFMClient:
         """Run RPFM's diagnostics (RPFM 5+) and return the open pack's results, optionally only these levels:
         dicts of path, level ("info" | "warning" | "error"), report_type, message, and columns/cells if given."""
         return await self._proto.run_diagnostics(pack_handle, levels)
-
-
-class RPFMConnection:
-    def __init__(self, host: str = "127.0.0.1", port: int = RPFM_DEFAULT_PORT, timeout: int = RPFM_DEFAULT_TIMEOUT):
-        self.client = RPFMClient(host, port, timeout)
-
-    async def __aenter__(self) -> RPFMClient:
-        await self.client.connect()
-        return self.client
-
-    async def __aexit__(
-        self,
-        exc_type: type[BaseException] | None,
-        exc_val: BaseException | None,
-        exc_tb: types.TracebackType | None,
-    ) -> None:
-        await self.client.disconnect()

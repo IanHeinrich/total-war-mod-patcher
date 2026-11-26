@@ -165,9 +165,9 @@ def extract(
 
     console.success(f"Extracted {summary}")
     console.header("\nNext steps:")
-    console.hint("1. Compare extracted tables/scripts in sources/")
-    console.hint("2. Create a patch mod folder: workspace/<name>/db/")
-    console.hint("3. Repack: tw-patcher repack --patch <name>")
+    console.hint("1. Compare: tw-patcher conflicts <mod> <mod> / tw-patcher diff <mod> <mod>")
+    console.hint("2. Create a patch: tw-patcher new-patch <name> --from <mod> --table <table>")
+    console.hint("3. Check and build: tw-patcher validate <name>, then tw-patcher repack --patch <name>")
 
 
 def _refresh(target_dir: Path, dry_run: bool, run: Runner) -> None:

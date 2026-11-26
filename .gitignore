@@ -32,3 +32,8 @@ ENV/
 # OS
 Thumbs.db
 .DS_Store
+
+# Built installers and executables (never commit these)
+*.exe
+*.dmg
+*.AppImage

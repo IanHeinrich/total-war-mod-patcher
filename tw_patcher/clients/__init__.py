@@ -1,3 +1,3 @@
-from .rpfm import RPFMClient, RPFMConnection
+from .rpfm import RPFMClient
 
-__all__ = ["RPFMClient", "RPFMConnection"]
+__all__ = ["RPFMClient"]
