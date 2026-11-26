@@ -48,7 +48,7 @@ class RichCommand(click.Command):
             _rich.print(f"\n  {desc}")
 
         params = self.get_params(ctx)
-        opts = [p for p in params if isinstance(p, click.Option) and p.name != "help"]
+        opts = [p for p in params if isinstance(p, click.Option) and "--help" not in p.opts]
         if opts:
             table = Table(show_header=False, box=None, padding=(0, 2), expand=False)
             table.add_column("Option", style="cyan", no_wrap=True)
