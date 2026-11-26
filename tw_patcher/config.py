@@ -2,6 +2,7 @@ import json
 import os
 import platform
 import re
+import sys
 from dataclasses import dataclass, field
 from pathlib import Path
 
@@ -278,7 +279,7 @@ class Settings:
 
     @staticmethod
     def _read_steam_registry_path() -> Path | None:
-        if platform.system() != "Windows":
+        if sys.platform != "win32":  # sys.platform (not platform.system) so type checkers narrow winreg
             return None
         try:
             import winreg

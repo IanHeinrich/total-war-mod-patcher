@@ -1,5 +1,4 @@
 import asyncio
-import platform
 import socket
 import subprocess
 import sys
@@ -43,7 +42,7 @@ class SystemService:
         launch_exe = server_exe if server_exe.exists() else rpfm_exe
         console.info(f"Launching: {launch_exe}")
 
-        if platform.system() == "Windows":
+        if sys.platform == "win32":
             subprocess.Popen([str(launch_exe)], creationflags=subprocess.CREATE_NEW_CONSOLE)
         else:
             subprocess.Popen([str(launch_exe)])
