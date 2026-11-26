@@ -4,7 +4,7 @@ import platform
 import tomllib
 from pathlib import Path
 
-from PyInstaller.utils.hooks import copy_metadata
+from PyInstaller.utils.hooks import collect_submodules, copy_metadata
 
 block_cipher = None
 
@@ -47,6 +47,20 @@ a = Analysis(
         "tw_patcher.services.repacking",
         "tw_patcher.services.scaffold",
         "tw_patcher.services.system",
+        "tw_patcher.services.replace",
+        "tw_patcher.services.scaffold_templates",
+        "tw_patcher.clients.rpfm_protocols",
+        "tw_patcher.data",
+        "tw_patcher.data.analysis",
+        "tw_patcher.data.index",
+        "tw_patcher.data.queries",
+        "tw_patcher.data.ron",
+        "tw_patcher.data.schema",
+        "tw_patcher.data.tsv",
+        "tw_patcher.mcp_server",
+        # The MCP SDK loads parts of itself dynamically
+        *collect_submodules("mcp", filter=lambda name: not name.startswith("mcp.cli")),  # mcp.cli needs typer
+        *collect_submodules("mcp_types"),
         "tw_patcher.ui",
         "tw_patcher.ui.app",
         "tw_patcher.ui.main_window",

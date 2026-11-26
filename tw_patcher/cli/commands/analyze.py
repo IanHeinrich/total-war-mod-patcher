@@ -5,7 +5,8 @@ from __future__ import annotations
 import click
 
 from ...console import console
-from ...data.analysis import diff_mods, find_conflicts, key_columns, merge_rows, row_key, validate_patch
+from ...data import queries
+from ...data.analysis import diff_mods, find_conflicts, validate_patch
 from .._data import capped, emit_json, fail, json_option, open_index, open_schema, resolve, table_name
 from ..main import cli
 
@@ -92,53 +93,31 @@ def show_cmd(
     index = open_index()
     mod = resolve(index, mod_name)
     table = table_name(table, [mod])
-    fragments = mod.fragments.get(table)
-    if not fragments:
-        fail(f"{mod.qualified} has no {table}. Tables: {', '.join(mod.tables()) or '(none)'}")
 
-    filters: list[tuple[str, str]] = []
+    where: dict[str, str] = {}
     for w in wheres:
         if "=" not in w:
             fail(f"--where expects COLUMN=VALUE, got {w!r}")
         col, _, val = w.partition("=")
-        filters.append((col.strip(), val))
+        where[col.strip()] = val
 
-    schema = open_schema(quiet=True)
-    merged = merge_rows(fragments, schema)
-    sample = next(iter(merged.values()))[0].table_file if merged else fragments[0].load()
-    kcols = key_columns(schema, sample)
-    header = sample.header
-    wanted = [c.strip() for c in columns.split(",")] if columns else header
-    for name in [*wanted, *(c for c, _ in filters)]:
-        if name not in header:
-            fail(f"No column {name!r} in {table}. Columns: {', '.join(header)}")
-
-    selected = []
-    for key, refs in merged.items():
-        if keys and "|".join(key) not in keys:
-            continue
-        values = refs[0].as_dict()
-        if all(values.get(c) == v for c, v in filters):
-            selected.append({"key": list(key), "from": refs[0].fragment.name, "values": {c: values[c] for c in wanted}})
-    shown, hidden = capped(selected, limit)
+    wanted_columns = [c.strip() for c in columns.split(",")] if columns else None
+    try:
+        result = queries.query_rows(
+            mod, table, open_schema(quiet=True), list(keys) or None, where or None, wanted_columns, limit=limit
+        )
+    except queries.QueryError as e:
+        fail(str(e))
+    kcols, wanted, shown = result["key_columns"], result["columns"], result["rows"]
+    hidden = result["total"] - len(shown)
 
     if as_json:
-        emit_json(
-            {
-                "mod": mod.qualified,
-                "table": table,
-                "key_columns": kcols,
-                "columns": wanted,
-                "total": len(selected),
-                "truncated": hidden > 0,
-                "rows": shown,
-            }
-        )
+        emit_json({k: result[k] for k in ("mod", "table", "key_columns", "columns", "total", "truncated", "rows")})
         return
     console.plain("\t".join(wanted))
     for row in shown:
         console.plain("\t".join(row["values"][c] for c in wanted))
-    note = f"{len(selected)} row(s)" + (f", {hidden} not shown (use --limit 0 for all)" if hidden else "")
+    note = f"{result['total']} row(s)" + (f", {hidden} not shown (use --limit 0 for all)" if hidden else "")
     console.hint(f"{note}; key: {', '.join(kcols) or 'unknown (no schema)'}")
 
 
@@ -163,24 +142,7 @@ def find_key_cmd(key: str, tables: tuple[str, ...], as_json: bool) -> None:
     index = open_index()
     mods = index.mods
     wanted = [table_name(t, mods) for t in tables] if tables else sorted({t for m in mods for t in m.tables()})
-    schema = open_schema(quiet=True)
-    hits: dict[str, list[dict[str, str]]] = {}
-    for table in wanted:
-        fragments = sorted(
-            (f for m in mods for f in m.fragments.get(table, [])), key=lambda f: (f.name.encode("utf-8"), f.mod.name)
-        )
-        for frag in fragments:
-            try:
-                tf = frag.load()
-            except Exception:
-                continue
-            cols = key_columns(schema, tf)
-            for row in tf.rows:
-                k = row_key(tf, row, cols) if cols else (row[0],)
-                if "|".join(k) == key:
-                    hits.setdefault(table, []).append(
-                        {"mod": frag.mod.qualified, "fragment": frag.name, "path": str(frag.path)}
-                    )
+    hits = queries.find_key(index, key, wanted, open_schema(quiet=True))["tables"]
     if as_json:
         emit_json({"key": key, "tables": hits})
         return
