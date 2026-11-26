@@ -31,6 +31,8 @@ class Settings:
     game_dirs: dict[str, Path] = field(default_factory=dict)
     modding_root: Path | None = field(default=None)
     rpfm_path: Path | None = field(default=None)
+    # Folder holding RPFM's schema_<game>.ron files; None = RPFM's own config folder
+    schema_dir: Path | None = field(default=None)
 
     def __post_init__(self):
         self._load_user_config()
@@ -169,6 +171,11 @@ class Settings:
     @property
     def game_art_dir(self) -> Path:
         return self._app_data_dir() / "game_art"
+
+    @property
+    def cache_dir(self) -> Path:
+        """Derived data that is safe to delete (e.g. parsed schemas)."""
+        return self._app_data_dir() / "cache"
 
     def list_workshop_mods(self) -> list[WorkshopMod]:
         workshop_dir = self.game_workshop_dir
@@ -354,6 +361,11 @@ class Settings:
                 path = Path(rp)
                 if path.exists():
                     self.rpfm_path = path
+
+            if sd := data.get("schema_dir"):
+                path = Path(sd)
+                if path.is_dir():
+                    self.schema_dir = path
         except (json.JSONDecodeError, OSError):
             pass
 
@@ -377,6 +389,8 @@ class Settings:
             data["modding_root"] = str(self.modding_root)
         if self.rpfm_path:
             data["rpfm_path"] = str(self.rpfm_path)
+        if self.schema_dir:
+            data["schema_dir"] = str(self.schema_dir)
         self.config_file.write_text(json.dumps(data, indent=2))
 
 

@@ -46,6 +46,7 @@ class Workspace:
     home: Path
     root: Path
     env: dict[str, str]
+    schemas: Path
 
     @property
     def sources(self) -> Path:
@@ -86,18 +87,36 @@ def rpfm(request: pytest.FixtureRequest) -> Iterator[FakeRPFM]:
     server.stop()
 
 
-@pytest.fixture
-def ws(tmp_path: Path, rpfm: FakeRPFM) -> Workspace:
+def _make_workspace(tmp_path: Path, rpfm_port: int | None) -> Workspace:
     home = tmp_path / "home"
     root = tmp_path / "modding"
-    home.mkdir()
-    root.mkdir()
+    schemas = tmp_path / "schemas"
+    for d in (home, root, schemas):
+        d.mkdir()
     (home / "config.json").write_text(json.dumps({"selected_game": GAME, "modding_root": str(root)}), encoding="utf-8")
     env = {
         **os.environ,
         "TW_PATCHER_HOME": str(home),
-        "TW_PATCHER_RPFM_PORT": str(rpfm.port),
+        # Empty by default so tests never pick up a real RPFM schema from this machine;
+        # a test opts in by writing schema_wh3.ron into Workspace.schemas.
+        "TW_PATCHER_SCHEMA_DIR": str(schemas),
         "PYTHONIOENCODING": "",  # exercise tw-patcher's own stream handling
         "COLUMNS": "200",  # keep Rich from wrapping assertions apart
     }
-    return Workspace(home=home, root=root, env=env)
+    if rpfm_port is not None:
+        env["TW_PATCHER_RPFM_PORT"] = str(rpfm_port)
+    else:
+        env["TW_PATCHER_RPFM_PORT"] = "9"  # discard port: nothing should try to reach RPFM
+    return Workspace(home=home, root=root, env=env, schemas=schemas)
+
+
+@pytest.fixture
+def ws(tmp_path: Path, rpfm: FakeRPFM) -> Workspace:
+    """Workspace wired to the fake RPFM server (runs once per RPFM protocol)."""
+    return _make_workspace(tmp_path, rpfm.port)
+
+
+@pytest.fixture
+def offline_ws(tmp_path: Path) -> Workspace:
+    """Workspace for commands that never talk to RPFM (tables, show, diff, validate, ...)."""
+    return _make_workspace(tmp_path, None)
