@@ -349,12 +349,21 @@ def copy_rows(
 
 def add_key_deletes(patch: Mod, table: str, keys: list[str], schema: Schema | None) -> EditResult:
     """Add rows to the patch's ``twad_key_deletes_tables`` (Warhammer 3, patch 6.3+) so the game
-    deletes those keys of ``table`` at load. ``keys`` use ``a|b`` for composite keys; the table
-    stores them concatenated with no separator and the short table name, as RPFM writes them."""
+    deletes those keys of ``table`` at load. ``keys`` use ``a|b`` for composite keys, in key-column
+    order; the table stores them concatenated in CA column order with the short table name, as RPFM
+    writes them."""
     if not schema or not schema.definition(KEY_DELETES_TABLE):
         raise QueryError("This game's schema has no twad_key_deletes_tables (it is Warhammer 3 6.3+ only)")
     short = table.removesuffix("_tables")
-    rows = [{"key": k.replace("|", ""), "table_name": short} for k in keys]
+    definition = schema.definition(table)
+    rows = []
+    for k in keys:
+        parts = k.split("|")
+        if definition and len(parts) == len(definition.key_columns) > 1:
+            # Keys arrive in key-column order (as query_rows shows them); RPFM concatenates them in CA order.
+            by_column = dict(zip(definition.key_columns, parts, strict=True))
+            parts = [by_column[c] for c in definition.ca_key_columns]
+        rows.append({"key": "".join(parts), "table_name": short})
     return upsert_rows(patch, KEY_DELETES_TABLE, rows, schema)
 
 

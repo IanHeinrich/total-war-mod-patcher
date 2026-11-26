@@ -197,6 +197,8 @@ class ConflictReport:
     collisions: list[KeyCollision] = field(default_factory=list)
     dangling: list[DanglingReference] = field(default_factory=list)
     unchecked_targets: list[str] = field(default_factory=list)  # referenced tables no loaded mod provides
+    broken_by_deletes: list[BrokenByDelete] = field(default_factory=list)
+    deletes_without_match: list[UnmatchedDelete] = field(default_factory=list)
 
 
 def find_conflicts(
@@ -233,7 +235,125 @@ def find_conflicts(
     if check_references and schema:
         dangling, unchecked = dangling_references(mods, mods + (context or []), schema)
         report.dangling, report.unchecked_targets = dangling, unchecked
+        report.broken_by_deletes, report.deletes_without_match = key_delete_effects(
+            mods, mods + (context or []), schema
+        )
     return report
+
+
+# ---------------------------------------------------------------------------- key deletes (Warhammer 3)
+
+KEY_DELETES_TABLE = "twad_key_deletes_tables"
+
+
+@dataclass
+class BrokenByDelete:
+    delete: str  # fragment label of the twad_key_deletes file
+    table: str  # table the row is deleted from
+    key: str  # deleted key as written in twad_key_deletes (key columns concatenated)
+    referenced_by: str  # fragment label of a row that still points at the deleted row
+    referencing_key: list[str]
+    column: str  # referencing_table.column
+
+
+@dataclass
+class UnmatchedDelete:
+    delete: str
+    table: str
+    key: str
+
+
+def _concat_key(tf: TableFile, row: list[str], schema: Schema) -> str | None:
+    definition = definition_for(schema, tf)
+    if not definition or not definition.key_columns:
+        return None
+    return "".join(tf.cell(row, c) for c in definition.ca_key_columns if tf.has_column(c))
+
+
+def key_delete_effects(
+    deleters: list[Mod], universe: list[Mod], schema: Schema
+) -> tuple[list[BrokenByDelete], list[UnmatchedDelete]]:
+    """What the ``twad_key_deletes_tables`` rows of ``deleters`` remove from ``universe``, and which remaining
+    rows still reference a removed one (the game crashes on load when that happens). Deletes that match no row
+    of ``universe`` are returned too: usually a typo or a key from a mod that isn't loaded."""
+    deletes: list[tuple[str, str, str]] = []  # (delete label, full table, concatenated key)
+    for mod in deleters:
+        for frag in mod.fragments.get(KEY_DELETES_TABLE, []):
+            try:
+                tf = frag.load()
+            except (TableFormatError, OSError, UnicodeDecodeError):
+                continue
+            if not (tf.has_column("key") and tf.has_column("table_name")):
+                continue
+            for row in tf.rows:
+                table = tf.cell(row, "table_name").strip()
+                if table:
+                    table = table if table.endswith("_tables") else f"{table}_tables"
+                    deletes.append((frag.label, table, tf.cell(row, "key")))
+    if not deletes:
+        return [], []
+
+    broken: list[BrokenByDelete] = []
+    unmatched: list[UnmatchedDelete] = []
+    merged_cache: dict[str, dict[Key, list[RowRef]]] = {}
+
+    def merged(table: str) -> dict[Key, list[RowRef]]:
+        if table not in merged_cache:
+            merged_cache[table] = merge_rows(effective_fragments(universe, table)[0], schema)
+        return merged_cache[table]
+
+    by_table: dict[str, list[tuple[str, str]]] = {}
+    for label, table, key in deletes:
+        by_table.setdefault(table, []).append((label, key))
+
+    # Pass 1: which rows every delete removes (so pass 2 can ignore references from removed rows too)
+    removed_by_table: dict[str, list[tuple[str, str, RowRef]]] = {}
+    for table, wanted in by_table.items():
+        rows_by_concat: dict[str, RowRef] = {}
+        for refs in merged(table).values():
+            concat = _concat_key(refs[0].table_file, refs[0].row, schema)
+            if concat is not None:
+                rows_by_concat[concat] = refs[0]
+        for label, key in wanted:
+            ref = rows_by_concat.get(key)
+            if ref is None:
+                unmatched.append(UnmatchedDelete(label, table, key))
+            else:
+                removed_by_table.setdefault(table, []).append((label, key, ref))
+    removed_rows = {id(ref.row) for removed in removed_by_table.values() for _, _, ref in removed}
+
+    # Pass 2: rows that survive and still point at a removed row
+    for table, removed in removed_by_table.items():
+        for ref_table, ref_column, target_column in schema.references_to(table):
+            if ref_table == KEY_DELETES_TABLE:
+                continue
+            referencing = merged(ref_table)
+            if not referencing:
+                continue
+            for label, key, ref in removed:
+                target_tf = ref.table_file
+                if not target_tf.has_column(target_column):
+                    continue
+                value = target_tf.cell(ref.row, target_column)
+                if not value:
+                    continue
+                for refs in referencing.values():
+                    other = refs[0]
+                    tf = other.table_file
+                    if id(other.row) in removed_rows or not tf.has_column(ref_column):
+                        continue
+                    if tf.cell(other.row, ref_column) == value:
+                        broken.append(
+                            BrokenByDelete(
+                                delete=label,
+                                table=table,
+                                key=key,
+                                referenced_by=other.fragment.label,
+                                referencing_key=list(row_key(tf, other.row, key_columns(schema, tf))),
+                                column=f"{ref_table}.{ref_column}",
+                            )
+                        )
+    return broken, unmatched
 
 
 def dangling_references(
@@ -361,7 +481,27 @@ def validate_patch(patch: Mod, schema: Schema | None, sources: list[Mod] | None 
                 else:
                     seen[key] = where
 
+    issues.extend(_override_and_order_issues(patch, schema, sources or []))
+
     if schema:
+        broken, unmatched = key_delete_effects([patch], [patch, *(sources or [])], schema)
+        for b in broken:
+            issues.append(
+                Issue(
+                    "warning",
+                    f"db/{KEY_DELETES_TABLE}/{b.delete.rsplit('/', 1)[-1]}.tsv",
+                    f"deleting {b.table} {b.key!r} breaks {b.column} in {b.referenced_by} (row {b.referencing_key}): "
+                    "the game crashes on load if both are loaded",
+                )
+            )
+        for u in unmatched:
+            issues.append(
+                Issue(
+                    "warning",
+                    f"db/{KEY_DELETES_TABLE}/{u.delete.rsplit('/', 1)[-1]}.tsv",
+                    f"deletes {u.table} {u.key!r}, which no source defines (typo, or a mod that isn't extracted?)",
+                )
+            )
         dangling, _ = dangling_references([patch], [patch, *(sources or [])], schema)
         for d in dangling:
             file = d.source.split(":", 1)[1]
@@ -372,6 +512,80 @@ def validate_patch(patch: Mod, schema: Schema | None, sources: list[Mod] | None 
                     f"{d.column}={d.value!r} (row {d.key}) not found in {d.target} in this patch or the sources",
                 )
             )
+    return issues
+
+
+def _override_and_order_issues(patch: Mod, schema: Schema | None, sources: list[Mod]) -> list[Issue]:
+    """Warnings about how the patch will combine with the sources in the game's merge:
+    whole-file overrides (incl. vanilla datacores) and rows that lose to a source fragment sorting first."""
+    issues: list[Issue] = []
+    for table, fragments in patch.fragments.items():
+        if table == KEY_DELETES_TABLE:
+            continue
+        source_frags = [f for m in sources for f in m.fragments.get(table, [])]
+        for frag in fragments:
+            rel = frag.path.relative_to(patch.root).as_posix()
+            same_name = sorted({f.mod.name for f in source_frags if f.name == frag.name})
+            if frag.name == "data__":
+                hint = (
+                    " On Warhammer 3 prefer twad_key_deletes_tables to remove rows."
+                    if schema and schema.definition(KEY_DELETES_TABLE)
+                    else ""
+                )
+                issues.append(
+                    Issue(
+                        "warning",
+                        rel,
+                        f"replaces vanilla's entire {table} (a datacore): rows added by later game patches or other "
+                        f"mods' changes to it are lost.{hint}",
+                    )
+                )
+            elif same_name:
+                issues.append(
+                    Issue(
+                        "warning",
+                        rel,
+                        f"same file name as {', '.join(same_name)}: if your pack loads first, it replaces their whole "
+                        f"db/{table}/{frag.name}; if theirs does, your file is ignored",
+                    )
+                )
+
+            # Rows the patch redefines but a source fragment sorting earlier would win
+            try:
+                tf = frag.load()
+            except (TableFormatError, OSError, UnicodeDecodeError):
+                continue
+            cols = key_columns(schema, tf)
+            if not cols:
+                continue
+            mine = {row_key(tf, r, cols): tf.as_dict(r) for r in tf.rows}
+            for other in source_frags:
+                if other.name == frag.name or other.name.encode("utf-8") >= frag.name.encode("utf-8"):
+                    continue
+                try:
+                    otf = other.load()
+                except (TableFormatError, OSError, UnicodeDecodeError):
+                    continue
+                ocols = key_columns(schema, otf)
+                if ocols != cols:
+                    continue
+                losing = [
+                    k
+                    for r in otf.rows
+                    if (k := row_key(otf, r, ocols)) in mine
+                    and any(mine[k].get(c) != v for c, v in otf.as_dict(r).items() if c in mine[k])
+                ]
+                if losing:
+                    sample = ", ".join("|".join(k) for k in losing[:3])
+                    more = f" and {len(losing) - 3} more" if len(losing) > 3 else ""
+                    issues.append(
+                        Issue(
+                            "warning",
+                            rel,
+                            f"{len(losing)} row(s) lose to {other.label} because its file name sorts first "
+                            f"({sample}{more}); rename your file to sort before {other.name!r} (e.g. start it with '!')",
+                        )
+                    )
     return issues
 
 

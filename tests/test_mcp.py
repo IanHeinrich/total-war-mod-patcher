@@ -372,7 +372,7 @@ def test_extract_and_repack_through_rpfm(ws: Workspace, rpfm: FakeRPFM) -> None:
 
         err, res = await call("extract_packs", {"packs": [str(pack)]})
         assert not err, res
-        assert res["mods"] == [{"mod": "sources/mod_a", "tables": 1, "scripts": 0, "failed": []}]
+        assert res["mods"] == [{"mod": "sources/mod_a", "tables": 1, "scripts": 0, "locs": 0, "failed": []}]
 
         err, res = await call("repack", {"patch": "my_patch"})
         assert not err, res

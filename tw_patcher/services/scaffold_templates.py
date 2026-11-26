@@ -41,7 +41,8 @@ Read and change data through tw-patcher, which keeps the format intact and only 
 
 **Same operations on the command line** (add `--json` for machine-readable output):
 `tw-patcher tables`, `show`, `find-key`, `diff`, `conflicts`, `validate`, `new-patch`,
-`extract`, `repack`, `replace-table`, `check`. Run `tw-patcher <command> --help` for options.
+`extract`, `status`, `repack`, `diagnose`, `replace-table`, `check`, `config`. Run
+`tw-patcher <command> --help` for options.
 
 **RPFM's own MCP server** (`rpfm` in `.mcp.json`, available while RPFM 5 is running) works inside
 individual packs: decoding any file type, schema details, RPFM diagnostics, global search. Use it for
@@ -49,16 +50,19 @@ pack-level questions; use tw-patcher for anything spanning several mods or the p
 
 ## Making a compatibility patch
 
-1. `workspace_status`. Extract any mod you need with `extract_packs` (absolute `.pack` paths; Workshop
-   packs are under `steamapps/workshop/content/<app id>/<item id>/`). For reference checks, extract the
-   game's `data/db.pack` too and pass it as `context`.
+1. `workspace_status`. Extract any mod you need with `extract_packs` (absolute `.pack` paths or Steam
+   Workshop item IDs). For reference checks also extract vanilla (`extract_packs(vanilla=True)`, optionally
+   limited with `tables=[...]`) and pass `sources/vanilla` as `context`. `tw-patcher status` shows which
+   extractions are older than their pack (re-extract with `tw-patcher extract --refresh`).
 2. `find_conflicts(mods=[...in load order, first wins...], context=[vanilla])` to see what clashes.
 3. `new_patch(name)`, then `copy_rows` the rows to fix from the mod they come from, and adjust them with
    `upsert_rows`. Remove rows from your patch with `delete_rows`; remove another mod's rows at load with
    `add_key_deletes`, but only after `find_key` / `find_conflicts` show nothing else references them
    (a deleted row that is still referenced crashes the game on load).
 4. `validate_patch` until it reports no errors.
-5. `repack` builds `output/<name>.pack`. Ask the user before copying it into the game's `data/` folder.
+5. `repack` builds `output/<name>.pack`. With RPFM 5, `tw-patcher diagnose --patch <name>` runs RPFM's own
+   checks too. Ask the user before installing it into the game's `data/` folder
+   (`tw-patcher repack --patch <name> --install`).
 
 ## How the game merges tables
 
@@ -67,6 +71,8 @@ pack-level questions; use tw-patcher for anything spanning several mods or the p
   first one wins. A patch meant to win should use a fragment name that sorts first (e.g. starting with `!`).
 - Load order between packs is set in the launcher or a mod manager; patches usually load before
   (above) the mods they patch.
+- `twad_key_deletes_tables` keys are the key columns concatenated in CA's column order; `add_key_deletes`
+  handles that. `find_conflicts` and `validate_patch` flag deletes that remove still-referenced rows.
 
 ## If you must edit a TSV by hand
 
@@ -103,10 +109,14 @@ DOCS_WORKFLOW = """\
 
 ```bash
 tw-patcher extract -s path/to/modA.pack -s path/to/modB.pack
+tw-patcher extract --workshop-id 2789857397          # by Steam Workshop item
+tw-patcher extract --vanilla -t land_units -t main_units   # the game's own tables, for reference
 ```
 
-Each pack lands in `sources/<pack name>/` (`db/` tables as TSV, `script/` files as-is). Add
-`--dry-run` to preview. Extraction exits with status 1 if any table failed, and lists the failures.
+Each pack lands in `sources/<pack name>/` (`db/` tables and `text/` loc files as TSV, `script/` files
+as-is). Add `--dry-run` to preview. Extraction exits with status 1 if anything failed, and lists the
+failures. `tw-patcher status` shows extractions whose pack has changed since; `extract --refresh`
+re-extracts them and summarises what changed in tables your patches use.
 
 ## 2. Find what clashes
 
@@ -144,7 +154,9 @@ tw-patcher repack --patch my_patch            # validates first; --no-validate s
 ```
 
 Output: `output/my_patch.pack`. If any table fails to import, nothing is saved unless you pass
-`--allow-partial`.
+`--allow-partial`. `--install` also copies it into the game's `data/` folder (set the game folder once
+with `tw-patcher config set-game-dir <folder>`). With RPFM 5, `tw-patcher diagnose --patch my_patch`
+runs RPFM's own diagnostics on the built pack.
 
 ## Fixing a table inside an existing pack
 
