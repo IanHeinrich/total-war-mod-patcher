@@ -3,6 +3,7 @@ from collections.abc import Generator
 from contextlib import contextmanager
 
 from rich.console import Console as RichConsole
+from rich.markup import escape
 from rich.theme import Theme
 
 
@@ -36,31 +37,35 @@ _theme = Theme(
 
 class Console:
     def __init__(self):
-        self._console = RichConsole(theme=_theme, highlight=False)
-        self._err = RichConsole(theme=_theme, stderr=True, highlight=False)
+        self._console = RichConsole(theme=_theme, highlight=False, soft_wrap=True)
+        self._err = RichConsole(theme=_theme, stderr=True, highlight=False, soft_wrap=True)
         self.verbose = False
 
     def error(self, msg: str) -> None:
-        self._err.print(f"[error]✗[/error] {msg}", style="error")
+        self._err.print(f"[error]✗[/error] {escape(msg)}", style="error")
 
     def warning(self, msg: str) -> None:
-        self._err.print(f"[warning]⚠[/warning] {msg}", style="warning")
+        self._err.print(f"[warning]⚠[/warning] {escape(msg)}", style="warning")
 
     def success(self, msg: str) -> None:
-        self._console.print(f"[success]✓[/success] {msg}", style="success")
+        self._console.print(f"[success]✓[/success] {escape(msg)}", style="success")
 
     def info(self, msg: str) -> None:
         if self.verbose:
-            self._console.print(msg, style="info")
+            self._console.print(escape(msg), style="info")
 
     def header(self, msg: str) -> None:
-        self._console.print(msg, style="header")
+        self._console.print(escape(msg), style="header")
 
     def hint(self, msg: str) -> None:
-        self._console.print(f"  {msg}", style="hint")
+        self._console.print(f"  {escape(msg)}", style="hint")
 
     def item(self, msg: str) -> None:
-        self._console.print(f"  {msg}")
+        self._console.print(f"  {escape(msg)}")
+
+    def plain(self, text: str = "") -> None:
+        """Print verbatim to stdout: no markup, no wrapping (tables, JSON, data an LLM will parse)."""
+        self._console.file.write(text + "\n")
 
     @contextmanager
     def status(self, msg: str) -> Generator[None, None, None]:

@@ -33,6 +33,7 @@ from ..main import cli
     default=None,
     help="Override output directory for the .pack file",
 )
+@click.option("--no-validate", is_flag=True, help="Skip the pre-repack checks (tw-patcher validate)")
 @click.option(
     "--allow-partial",
     is_flag=True,
@@ -45,6 +46,7 @@ def repack(
     workspace_dir: Path | None,
     output_dir: Path | None,
     allow_partial: bool,
+    no_validate: bool,
 ) -> None:
     """Repack a patch mod from workspace/ into a .pack file.
 
@@ -70,8 +72,11 @@ def repack(
         if available:
             console.hint(f"Available: {', '.join(available)}")
         else:
-            console.hint(f"No patch mods exist yet. Create one: mkdir workspace\\{patch}\\db")
+            console.hint(f"No patch mods exist yet. Create one: tw-patcher new-patch {patch}")
         sys.exit(1)
+
+    if not no_validate:
+        _validate_first(patch_path)
 
     out_dir = output_dir or settings.output_dir
     effective_output = output
@@ -108,3 +113,21 @@ def repack(
 
     console.success(f"Pack file created: {result.output_path}")
     console.item(counts)
+
+
+def _validate_first(patch_path: Path) -> None:
+    """Run the same checks as `tw-patcher validate` and stop before RPFM on errors."""
+    from ...data.analysis import validate_patch
+    from ...data.index import Mod, ModIndex
+    from .._data import open_schema
+
+    schema = open_schema()
+    sources = ModIndex(settings.sources_dir, patch_path.parent).sources
+    issues = validate_patch(Mod(patch_path.name, "patch", patch_path), schema, sources)
+    errors = [i for i in issues if i.level == "error"]
+    for i in issues:
+        where = f"{i.file}:{i.line}" if i.line else i.file
+        (console.error if i.level == "error" else console.warning)(f"{where}: {i.message}")
+    if errors:
+        console.error(f"Not repacking: {len(errors)} validation error(s). Fix them, or pass --no-validate to skip.")
+        sys.exit(1)
