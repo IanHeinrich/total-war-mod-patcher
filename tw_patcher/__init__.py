@@ -6,7 +6,7 @@ try:
 except PackageNotFoundError:  # running from a source tree that was never installed
     __version__ = "0.0.0+unknown"
 
-from .clients.rpfm import RPFMClient, RPFMConnection
+from .clients.rpfm import RPFMClient
 from .config import Settings, settings
 from .services.extraction import ExtractionService
 from .services.repacking import RepackingService
@@ -16,7 +16,6 @@ __all__ = [
     "Settings",
     "settings",
     "RPFMClient",
-    "RPFMConnection",
     "ExtractionService",
     "RepackingService",
     "SystemService",

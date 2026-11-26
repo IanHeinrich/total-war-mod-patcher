@@ -133,7 +133,7 @@ def test_config_show_lists_resolved_folders(offline_ws: Workspace) -> None:
     for folder in (offline_ws.sources, offline_ws.workspace, offline_ws.output):
         assert str(folder) in result.stdout
     assert "Game data folder: (not set)" in result.stdout
-    assert "Schema folder:    (RPFM default)" in result.stdout
+    assert f"Schema folder:    {offline_ws.schemas}" in result.stdout  # TW_PATCHER_SCHEMA_DIR from the fixture
 
 
 def test_config_show_json(offline_ws: Workspace, tmp_path: Path) -> None:
@@ -147,7 +147,7 @@ def test_config_show_json(offline_ws: Workspace, tmp_path: Path) -> None:
     assert data["selected_game"] == GAME
     assert data["workspace_dir"] == str(offline_ws.workspace)
     assert data["game_data_dir"] == str(game_dir / "data")
-    assert data["schema_dir"] is None
+    assert data["schema_dir"] == str(offline_ws.schemas)  # TW_PATCHER_SCHEMA_DIR from the fixture
 
 
 # ---------------------------------------------------------------------- diagnose
@@ -242,3 +242,19 @@ def test_diagnose_needs_exactly_one_target(offline_ws: Workspace) -> None:
 
     assert result.exit_code == 1
     assert "exactly one of --pack or --patch" in result.stderr
+
+
+def test_schema_dir_env_beats_config_and_is_not_saved(offline_ws: Workspace, tmp_path: Path) -> None:
+    configured = tmp_path / "configured_schemas"
+    configured.mkdir()
+    config = json.loads((offline_ws.home / "config.json").read_text(encoding="utf-8"))
+    config["schema_dir"] = str(configured)
+    (offline_ws.home / "config.json").write_text(json.dumps(config), encoding="utf-8")
+
+    shown = offline_ws.run("config", "show", "--json")
+    assert shown.exit_code == 0, shown.output
+    assert json.loads(shown.stdout)["schema_dir"] == str(offline_ws.schemas)  # env (set by the fixture) wins
+
+    offline_ws.run("--game", "warhammer_3", "config", "show")  # --game saves the config
+    saved = json.loads((offline_ws.home / "config.json").read_text(encoding="utf-8"))
+    assert saved["schema_dir"] == str(configured)

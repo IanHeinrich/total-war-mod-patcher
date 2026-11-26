@@ -36,6 +36,9 @@ class Settings:
 
     def __post_init__(self):
         self._load_user_config()
+        # The environment beats config.json, as for TW_PATCHER_HOME and TW_PATCHER_RPFM_PORT
+        if env_schema_dir := os.environ.get("TW_PATCHER_SCHEMA_DIR"):
+            self.schema_dir = Path(env_schema_dir)
         if not self.selected_game:
             self._auto_select_first_game()
 
@@ -389,8 +392,8 @@ class Settings:
             data["modding_root"] = str(self.modding_root)
         if self.rpfm_path:
             data["rpfm_path"] = str(self.rpfm_path)
-        if self.schema_dir:
-            data["schema_dir"] = str(self.schema_dir)
+        if self.schema_dir and str(self.schema_dir) != os.environ.get("TW_PATCHER_SCHEMA_DIR"):
+            data["schema_dir"] = str(self.schema_dir)  # don't persist a value that only came from the environment
         self.config_file.write_text(json.dumps(data, indent=2))
 
 

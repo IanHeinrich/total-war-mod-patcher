@@ -48,7 +48,7 @@ class RichCommand(click.Command):
             _rich.print(f"\n  {desc}")
 
         params = self.get_params(ctx)
-        opts = [p for p in params if isinstance(p, click.Option) and p.name != "help"]
+        opts = [p for p in params if isinstance(p, click.Option) and "--help" not in p.opts]
         if opts:
             table = Table(show_header=False, box=None, padding=(0, 2), expand=False)
             table.add_column("Option", style="cyan", no_wrap=True)
@@ -60,9 +60,13 @@ class RichCommand(click.Command):
                 help_str = param.help or ""
                 if param.required:
                     help_str += " [yellow](required)[/yellow]"
-                elif param.default and not param.is_flag and param.multiple:
-                    pass
-                elif param.default and not param.is_flag and param.default != () and "default:" not in help_str:
+                elif (
+                    param.default
+                    and not param.is_flag
+                    and not param.multiple
+                    and param.default != ()
+                    and "default:" not in help_str
+                ):
                     help_str += f" [dim](default: {param.default})[/dim]"
                 table.add_row(decls, help_str)
 

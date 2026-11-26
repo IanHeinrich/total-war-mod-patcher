@@ -44,7 +44,14 @@ jobs:
       - name: Get version from tag
         id: version
         shell: bash
-        run: echo "version=${GITHUB_REF_NAME#v}" >> "$GITHUB_OUTPUT"
+        run: |
+          version="${GITHUB_REF_NAME#v}"
+          declared=$(python -c "import tomllib; print(tomllib.load(open('pyproject.toml','rb'))['project']['version'])")
+          if [ "$version" != "$declared" ]; then
+            echo "::error::Tag v$version does not match pyproject.toml version $declared; bump pyproject.toml first"
+            exit 1
+          fi
+          echo "version=$version" >> "$GITHUB_OUTPUT"
 
       - name: Install dependencies
         run: pip install -e ".[build]"
