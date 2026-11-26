@@ -1,5 +1,8 @@
-import urllib.request
+# pyright: reportCallIssue=false
+# (PyQt6 6.12 stubs reject pyqtSignal(<type>) calls; they are correct at runtime)
 import urllib.error
+import urllib.request
+from collections.abc import Callable
 from pathlib import Path
 
 from PyQt6.QtCore import QThread, pyqtSignal
@@ -32,10 +35,11 @@ class ArtworkLoader:
         self._cache_dir = cache_dir
         self._cache_dir.mkdir(exist_ok=True)
         self._workers: list[ArtworkDownloadWorker] = []
-        self._pending: dict[str, list[callable]] = {}
+        self._pending: dict[str, list[Callable[[str, QPixmap], None]]] = {}
 
-    def load(self, game_def: GameDef, callback: callable) -> None:
-        if not game_def.header_image_url or not game_def.steam_app_id:
+    def load(self, game_def: GameDef, callback: Callable[[str, QPixmap], None]) -> None:
+        app_id = game_def.steam_app_id
+        if not game_def.header_image_url or not app_id:
             return
 
         cached = self._cache_dir / f"{game_def.steam_app_id}.jpg"
@@ -51,7 +55,7 @@ class ArtworkLoader:
 
         self._pending[game_def.key] = [callback]
         worker = ArtworkDownloadWorker(game_def.key, game_def.header_image_url)
-        worker.downloaded.connect(lambda key, data: self._on_downloaded(key, data, game_def.steam_app_id))
+        worker.downloaded.connect(lambda key, data: self._on_downloaded(key, data, app_id))
         self._workers.append(worker)
         worker.start()
 

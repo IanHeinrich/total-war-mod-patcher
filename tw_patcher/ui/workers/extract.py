@@ -1,7 +1,8 @@
+# pyright: reportCallIssue=false
+# (PyQt6 6.12 stubs reject pyqtSignal(<type>) calls; they are correct at runtime)
 import asyncio
 import traceback
 from pathlib import Path
-from typing import Optional
 
 from PyQt6.QtCore import QThread, pyqtSignal
 
@@ -15,13 +16,14 @@ class ExtractWorker(QThread):
     finished = pyqtSignal(bool, str)
     progress = pyqtSignal(str)
 
-    def __init__(self, sources: list[str], output: Optional[str] = None):
+    def __init__(self, sources: list[str], output: str | None = None):
         super().__init__()
         self.sources = sources
         self.output = output
 
     def run(self) -> None:
         try:
+
             async def _run():
                 system = SystemService(settings)
                 client = RPFMClient(settings.rpfm_host, settings.rpfm_port, settings.rpfm_timeout)
@@ -40,8 +42,7 @@ class ExtractWorker(QThread):
             total_tables = sum(len(r.tables_exported) for r in results)
             total_scripts = sum(len(r.scripts_extracted) for r in results)
             self.finished.emit(
-                True,
-                f"Extracted {len(self.sources)} mod(s): {total_tables} tables, {total_scripts} scripts"
+                True, f"Extracted {len(self.sources)} mod(s): {total_tables} tables, {total_scripts} scripts"
             )
         except Exception as e:
             self.finished.emit(False, f"Extraction failed: {e}\n{traceback.format_exc()}")

@@ -2,11 +2,10 @@ from __future__ import annotations
 
 import json
 import time
-import urllib.request
 import urllib.error
+import urllib.request
 from pathlib import Path
 from typing import TypedDict
-
 
 from ..constants import HTTP_TIMEOUT
 
@@ -27,10 +26,7 @@ class SteamWorkshopClient:
         self._cache: dict[str, WorkshopDetails] = self._load_cache()
 
     def get_details(self, workshop_ids: list[str]) -> dict[str, WorkshopDetails]:
-        stale_ids = [
-            wid for wid in workshop_ids
-            if wid not in self._cache or self._is_stale(self._cache[wid])
-        ]
+        stale_ids = [wid for wid in workshop_ids if wid not in self._cache or self._is_stale(self._cache[wid])]
 
         if stale_ids:
             fetched = self._fetch_batch(stale_ids)
@@ -48,7 +44,7 @@ class SteamWorkshopClient:
     def _fetch_batch(self, ids: list[str]) -> dict[str, WorkshopDetails]:
         results: dict[str, WorkshopDetails] = {}
         for i in range(0, len(ids), BATCH_SIZE):
-            batch = ids[i:i + BATCH_SIZE]
+            batch = ids[i : i + BATCH_SIZE]
             results.update(self._fetch_chunk(batch))
         return results
 

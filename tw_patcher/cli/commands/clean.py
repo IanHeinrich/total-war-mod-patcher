@@ -9,16 +9,16 @@ from ..main import cli
 
 @cli.command()
 @click.option(
-    '--sources-dir',
+    "--sources-dir",
     type=click.Path(exists=True, file_okay=False, path_type=Path),
     default=None,
-    help='Override sources directory to clean'
+    help="Override sources directory to clean",
 )
 @click.option(
-    '--output-dir',
+    "--output-dir",
     type=click.Path(exists=True, file_okay=False, path_type=Path),
     default=None,
-    help='Override output directory to clean'
+    help="Override output directory to clean",
 )
 def clean(sources_dir: Path | None, output_dir: Path | None) -> None:
     """Remove all files from sources/ and output/ to start fresh."""
@@ -34,7 +34,7 @@ def clean(sources_dir: Path | None, output_dir: Path | None) -> None:
 
     for directory in dirs_to_clean:
         for child in directory.iterdir():
-            if child.name.startswith('.'):
+            if child.name.startswith("."):
                 continue
             if child.is_dir():
                 shutil.rmtree(child)

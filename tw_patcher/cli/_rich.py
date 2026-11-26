@@ -87,6 +87,7 @@ class RichCommand(click.Command):
 
 class RichGroup(click.Group):
     """Click group with Rich-formatted help output."""
+
     command_class = RichCommand
 
     def get_help(self, ctx: click.Context) -> str:
@@ -100,11 +101,13 @@ class RichGroup(click.Group):
         is_root = ctx.parent is None
 
         if is_root:
-            _rich.print(Panel.fit(
-                "[bold]Total War Mod Patcher[/bold]\n"
-                "[dim]Extract, compare, and repack Total War mod pack files.[/dim]",
-                border_style="blue",
-            ))
+            _rich.print(
+                Panel.fit(
+                    "[bold]Total War Mod Patcher[/bold]\n"
+                    "[dim]Extract, compare, and repack Total War mod pack files.[/dim]",
+                    border_style="blue",
+                )
+            )
         else:
             desc = self.help or ""
             prog = ctx.command_path

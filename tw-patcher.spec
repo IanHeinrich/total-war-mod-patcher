@@ -1,11 +1,16 @@
 # -*- mode: python ; coding: utf-8 -*-
 
 import platform
+import tomllib
 from pathlib import Path
+
+from PyInstaller.utils.hooks import copy_metadata
 
 block_cipher = None
 
 ROOT = Path(SPECPATH)
+# Single source of truth for the version: pyproject.toml
+APP_VERSION = tomllib.loads((ROOT / "pyproject.toml").read_text(encoding="utf-8"))["project"]["version"]
 ICONS_DIR = ROOT / "icons"
 
 # Determine platform-specific icon
@@ -21,7 +26,7 @@ a = Analysis(
     [str(ROOT / "tw_patcher" / "__main__.py")],
     pathex=[str(ROOT)],
     binaries=[],
-    datas=[],
+    datas=copy_metadata("tw-mod-patcher"),  # dist-info so __version__ resolves when frozen
     hiddenimports=[
         "tw_patcher",
         "tw_patcher.__main__",
@@ -103,7 +108,7 @@ gui_a = Analysis(
     [str(ROOT / "tw_patcher" / "__gui__.py")],
     pathex=[str(ROOT)],
     binaries=[],
-    datas=[],
+    datas=copy_metadata("tw-mod-patcher"),  # dist-info so __version__ resolves when frozen
     hiddenimports=[
         "tw_patcher",
         "tw_patcher.ui",
@@ -187,8 +192,8 @@ if system == "Darwin":
         icon=icon_file,
         bundle_identifier="com.tw-patcher.app",
         info_plist={
-            "CFBundleShortVersionString": "0.3.0",
-            "CFBundleVersion": "0.3.0",
+            "CFBundleShortVersionString": APP_VERSION,
+            "CFBundleVersion": APP_VERSION,
             "NSHighResolutionCapable": True,
         },
     )

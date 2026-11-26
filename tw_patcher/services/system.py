@@ -1,10 +1,8 @@
 import asyncio
-import platform
 import socket
 import subprocess
 import sys
 from pathlib import Path
-from typing import Optional
 
 from ..clients.rpfm import RPFMClient
 from ..config import Settings
@@ -17,7 +15,7 @@ class SystemService:
     def __init__(self, settings: Settings):
         self.settings = settings
 
-    def find_rpfm_executable(self) -> Optional[Path]:
+    def find_rpfm_executable(self) -> Path | None:
         for path in self.settings.rpfm_search_paths:
             if path.exists() and path.is_file():
                 console.info(f"Found RPFM at: {path}")
@@ -37,15 +35,14 @@ class SystemService:
         rpfm_exe = self.find_rpfm_executable()
         if not rpfm_exe:
             raise ConfigurationError(
-                "Cannot find RPFM installation. Please install RPFM from "
-                "https://github.com/Frodo45127/rpfm/releases"
+                "Cannot find RPFM installation. Please install RPFM from https://github.com/Frodo45127/rpfm/releases"
             )
 
         server_exe = rpfm_exe.parent / "rpfm_server.exe"
         launch_exe = server_exe if server_exe.exists() else rpfm_exe
         console.info(f"Launching: {launch_exe}")
 
-        if platform.system() == "Windows":
+        if sys.platform == "win32":
             subprocess.Popen([str(launch_exe)], creationflags=subprocess.CREATE_NEW_CONSOLE)
         else:
             subprocess.Popen([str(launch_exe)])
@@ -74,10 +71,6 @@ class SystemService:
     def check_system(self) -> None:
         console.info("Checking system requirements...")
 
-        if sys.version_info < (3, 10):
-            raise ConfigurationError(
-                f"Python 3.10+ required, found {sys.version_info.major}.{sys.version_info.minor}"
-            )
         console.info(f"Python {sys.version_info.major}.{sys.version_info.minor} OK")
 
         if not self.find_rpfm_executable():

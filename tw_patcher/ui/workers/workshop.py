@@ -1,3 +1,5 @@
+# pyright: reportCallIssue=false
+# (PyQt6 6.12 stubs reject pyqtSignal(<type>) calls; they are correct at runtime)
 from pathlib import Path
 
 from PyQt6.QtCore import QThread, pyqtSignal

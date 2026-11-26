@@ -7,22 +7,19 @@ from ...console import console
 from ..main import cli
 
 
-@cli.command('list')
+@cli.command("list")
 @click.option(
-    '--workspace-dir',
+    "--workspace-dir",
     type=click.Path(exists=True, file_okay=False, path_type=Path),
     default=None,
-    help='Override workspace directory to list patch mods from'
+    help="Override workspace directory to list patch mods from",
 )
 def list_cmd(workspace_dir: Path | None) -> None:
     """List available patch mods in the workspace."""
     settings.ensure_dirs()
     ws = workspace_dir or settings.workspace_dir
 
-    mods = sorted(
-        d.name for d in ws.iterdir()
-        if d.is_dir() and not d.name.startswith('.')
-    ) if ws.exists() else []
+    mods = sorted(d.name for d in ws.iterdir() if d.is_dir() and not d.name.startswith(".")) if ws.exists() else []
 
     if not mods:
         console.warning(f"No patch mods found in {ws}")

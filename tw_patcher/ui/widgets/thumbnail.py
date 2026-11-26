@@ -1,10 +1,12 @@
+# pyright: reportCallIssue=false
+# (PyQt6 6.12 stubs reject pyqtSignal(<type>) calls; they are correct at runtime)
 from __future__ import annotations
 
-import urllib.request
 import urllib.error
+import urllib.request
 from pathlib import Path
 
-from PyQt6.QtCore import QThread, pyqtSignal, QObject
+from PyQt6.QtCore import QObject, QThread, pyqtSignal
 from PyQt6.QtGui import QPixmap
 
 from ...constants import THUMBNAIL_TIMEOUT

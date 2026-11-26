@@ -1,14 +1,21 @@
 import shutil
 
 from PyQt6.QtWidgets import (
-    QVBoxLayout, QHBoxLayout, QLabel, QPushButton, QListWidget,
-    QFileDialog, QMessageBox, QProgressBar, QDialog,
+    QDialog,
+    QFileDialog,
+    QHBoxLayout,
+    QLabel,
+    QListWidget,
+    QMessageBox,
+    QProgressBar,
+    QPushButton,
+    QVBoxLayout,
 )
 
 from ...config import settings
-from ..state import AppState
-from ..panels import BasePanel
 from ..dialogs import WorkshopBrowserDialog
+from ..panels import BasePanel
+from ..state import AppState
 from ..workers import ExtractWorker
 
 
@@ -77,7 +84,8 @@ class ExtractPanel(BasePanel):
             return
 
         reply = QMessageBox.question(
-            self, "Clear Sources",
+            self,
+            "Clear Sources",
             f"Delete {len(entries)} extracted mod folder(s) from sources/?",
             QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
         )
@@ -98,8 +106,7 @@ class ExtractPanel(BasePanel):
     def _browse_workshop(self) -> None:
         if not settings.game_workshop_dir:
             QMessageBox.warning(
-                self, "No Workshop Folder",
-                "Set the game install directory first to browse workshop mods."
+                self, "No Workshop Folder", "Set the game install directory first to browse workshop mods."
             )
             return
 
@@ -123,10 +130,7 @@ class ExtractPanel(BasePanel):
                     current.add(item.text())
             for path in selected:
                 if self.source_list.count() >= settings.max_mods:
-                    QMessageBox.warning(
-                        self, "Limit Reached",
-                        f"Maximum {settings.max_mods} source mods allowed."
-                    )
+                    QMessageBox.warning(self, "Limit Reached", f"Maximum {settings.max_mods} source mods allowed.")
                     break
                 if path not in current:
                     self.source_list.addItem(path)
@@ -139,8 +143,7 @@ class ExtractPanel(BasePanel):
 
         start_dir = str(settings.game_workshop_dir or "")
         files, _ = QFileDialog.getOpenFileNames(
-            self, "Select .pack File(s)", start_dir,
-            "Pack Files (*.pack);;All Files (*)"
+            self, "Select .pack File(s)", start_dir, "Pack Files (*.pack);;All Files (*)"
         )
         existing: set[str] = set()
         for i in range(self.source_list.count()):
@@ -164,10 +167,7 @@ class ExtractPanel(BasePanel):
             return
 
         if self.source_list.count() > settings.max_mods:
-            QMessageBox.warning(
-                self, "Too Many",
-                f"Maximum {settings.max_mods} source mods allowed."
-            )
+            QMessageBox.warning(self, "Too Many", f"Maximum {settings.max_mods} source mods allowed.")
             return
 
         sources: list[str] = []

@@ -1,18 +1,24 @@
-from pathlib import Path
-import subprocess
 import shutil
+import subprocess
+from pathlib import Path
 
 from PyQt6.QtWidgets import (
-    QHBoxLayout, QVBoxLayout, QLabel, QLineEdit, QPushButton,
-    QFileDialog, QMessageBox, QMenu,
+    QFileDialog,
+    QHBoxLayout,
+    QLabel,
+    QLineEdit,
+    QMenu,
+    QMessageBox,
+    QPushButton,
+    QVBoxLayout,
 )
 
 from ...config import settings
 from ...models.game import GAMES
 from ...services.scaffold import ScaffoldService
 from ...services.system import SystemService
-from ..state import AppState
 from ..panels import BasePanel
+from ..state import AppState
 
 
 class SettingsPanel(BasePanel):
@@ -107,17 +113,13 @@ class SettingsPanel(BasePanel):
                 if cmd:
                     subprocess.Popen([cmd, str(path)])
                 else:
-                    QMessageBox.warning(
-                        self, "Not Found",
-                        f"'{editor}' not found on PATH."
-                    )
+                    QMessageBox.warning(self, "Not Found", f"'{editor}' not found on PATH.")
         except OSError as e:
             QMessageBox.warning(self, "Error", str(e))
 
     def _browse_modding_root(self) -> None:
         dir_path = QFileDialog.getExistingDirectory(
-            self, "Select Modding Workspace Folder",
-            str(settings.modding_root or "")
+            self, "Select Modding Workspace Folder", str(settings.modding_root or "")
         )
         if not dir_path:
             return
@@ -131,24 +133,30 @@ class SettingsPanel(BasePanel):
 
         scaffold = ScaffoldService(path)
         would_create = [
-            rel for rel in [
+            rel
+            for rel in [
                 "modding_docs/README.md",
                 ".github/copilot-instructions.md",
                 "CLAUDE.md",
                 ".cursorrules",
-            ] if not (path / rel).exists()
+            ]
+            if not (path / rel).exists()
         ]
 
         if would_create:
-            generate_helpers = QMessageBox.question(
-                self, "Generate Helper Files?",
-                "Would you like to generate modding docs and AI coding assistant "
-                "instructions in the workspace?\n\n"
-                "This creates modding_docs/, .github/copilot-instructions.md, "
-                "CLAUDE.md, and .cursorrules.",
-                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
-                QMessageBox.StandardButton.Yes,
-            ) == QMessageBox.StandardButton.Yes
+            generate_helpers = (
+                QMessageBox.question(
+                    self,
+                    "Generate Helper Files?",
+                    "Would you like to generate modding docs and AI coding assistant "
+                    "instructions in the workspace?\n\n"
+                    "This creates modding_docs/, .github/copilot-instructions.md, "
+                    "CLAUDE.md, and .cursorrules.",
+                    QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+                    QMessageBox.StandardButton.Yes,
+                )
+                == QMessageBox.StandardButton.Yes
+            )
 
             if generate_helpers:
                 created = scaffold.scaffold()
@@ -167,8 +175,7 @@ class SettingsPanel(BasePanel):
 
         game_def = GAMES[settings.selected_game]
         dir_path = QFileDialog.getExistingDirectory(
-            self, f"Select {game_def.display_name} Install Folder",
-            str(settings.game_dir or "")
+            self, f"Select {game_def.display_name} Install Folder", str(settings.game_dir or "")
         )
         if not dir_path:
             return
@@ -176,9 +183,9 @@ class SettingsPanel(BasePanel):
         path = Path(dir_path)
         if not (path / "data").is_dir():
             QMessageBox.warning(
-                self, "Invalid Folder",
-                f"Selected folder doesn't appear to be a {game_def.display_name} install "
-                "(no 'data' subfolder found)."
+                self,
+                "Invalid Folder",
+                f"Selected folder doesn't appear to be a {game_def.display_name} install (no 'data' subfolder found).",
             )
             return
 
@@ -191,8 +198,7 @@ class SettingsPanel(BasePanel):
 
     def _browse_rpfm(self) -> None:
         dir_path = QFileDialog.getExistingDirectory(
-            self, "Select RPFM Installation Folder",
-            str(settings.rpfm_path or "")
+            self, "Select RPFM Installation Folder", str(settings.rpfm_path or "")
         )
         if not dir_path:
             return
@@ -203,9 +209,9 @@ class SettingsPanel(BasePanel):
         has_ui = (path / "rpfm_ui.exe").exists() or (path / "rpfm_ui").exists()
         if not has_server and not has_ui:
             QMessageBox.warning(
-                self, "Invalid Folder",
-                "Selected folder doesn't appear to contain RPFM "
-                "(no rpfm_server or rpfm_ui found)."
+                self,
+                "Invalid Folder",
+                "Selected folder doesn't appear to contain RPFM (no rpfm_server or rpfm_ui found).",
             )
             return
 

@@ -1,5 +1,4 @@
 from pathlib import Path
-from typing import Optional
 
 from ..clients.rpfm import RPFMClient
 from ..config import Settings
@@ -26,9 +25,9 @@ class RepackingService:
     async def repack(
         self,
         patch_name: str,
-        output_path: Optional[Path] = None,
-        pack_name: Optional[str] = None,
-        workspace_dir: Optional[Path] = None,
+        output_path: Path | None = None,
+        pack_name: str | None = None,
+        workspace_dir: Path | None = None,
     ) -> RepackResult:
         if workspace_dir:
             source_dir = workspace_dir / patch_name
@@ -85,7 +84,7 @@ class RepackingService:
             with console.status("Importing scripts..."):
                 for script_file in script_files:
                     relative_path = script_file.relative_to(source_dir)
-                    container_path = str(relative_path).replace('\\', '/')
+                    container_path = str(relative_path).replace("\\", "/")
 
                     try:
                         await self.client.add_packed_file(
@@ -114,7 +113,7 @@ class RepackingService:
 
         return result
 
-    def _resolve_output_path(self, patch_name: str, pack_name: Optional[str]) -> Path:
+    def _resolve_output_path(self, patch_name: str, pack_name: str | None) -> Path:
         self.settings.output_dir.mkdir(parents=True, exist_ok=True)
         filename = f"{pack_name or patch_name}.pack"
         return self.settings.output_dir / filename

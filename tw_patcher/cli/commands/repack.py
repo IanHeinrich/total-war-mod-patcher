@@ -12,38 +12,30 @@ from ..main import cli
 
 
 @cli.command()
+@click.option("--patch", "-p", required=True, type=str, help="Name of the patch mod in workspace/ to repack")
 @click.option(
-    '--patch', '-p',
-    required=True,
-    type=str,
-    help='Name of the patch mod in workspace/ to repack'
-)
-@click.option(
-    '--output', '-o',
+    "--output",
+    "-o",
     type=click.Path(path_type=Path),
     default=None,
-    help='Output .pack file path (default: output/<patch_name>.pack)'
+    help="Output .pack file path (default: output/<patch_name>.pack)",
 )
+@click.option("--name", "-n", type=str, default=None, help="Custom output filename (without .pack extension)")
 @click.option(
-    '--name', '-n',
-    type=str,
-    default=None,
-    help='Custom output filename (without .pack extension)'
-)
-@click.option(
-    '--workspace-dir',
+    "--workspace-dir",
     type=click.Path(exists=True, file_okay=False, path_type=Path),
     default=None,
-    help='Override workspace directory containing the patch mod'
+    help="Override workspace directory containing the patch mod",
 )
 @click.option(
-    '--output-dir',
+    "--output-dir",
     type=click.Path(file_okay=False, path_type=Path),
     default=None,
-    help='Override output directory for the .pack file'
+    help="Override output directory for the .pack file",
 )
-def repack(patch: str, output: Path | None, name: str | None,
-           workspace_dir: Path | None, output_dir: Path | None) -> None:
+def repack(
+    patch: str, output: Path | None, name: str | None, workspace_dir: Path | None, output_dir: Path | None
+) -> None:
     """Repack a patch mod from workspace/ into a .pack file.
 
     Examples:\b
@@ -57,10 +49,9 @@ def repack(patch: str, output: Path | None, name: str | None,
     ws = workspace_dir or settings.workspace_dir
     patch_path = ws / patch
     if not patch_path.exists():
-        available = sorted(
-            d.name for d in ws.iterdir()
-            if d.is_dir() and not d.name.startswith('.')
-        ) if ws.exists() else []
+        available = (
+            sorted(d.name for d in ws.iterdir() if d.is_dir() and not d.name.startswith(".")) if ws.exists() else []
+        )
         console.error(f"Patch mod '{patch}' not found in {ws}")
         if available:
             console.hint(f"Available: {', '.join(available)}")
@@ -76,24 +67,21 @@ def repack(patch: str, output: Path | None, name: str | None,
         effective_output = out_dir / f"{pack_name}.pack"
 
     try:
+
         async def _run():
             system = create_system_service()
             client = create_client()
             await system.connect_client(client)
             try:
                 service = RepackingService(settings, client)
-                return await service.repack(patch, effective_output, name,
-                                            workspace_dir=ws)
+                return await service.repack(patch, effective_output, name, workspace_dir=ws)
             finally:
                 await client.disconnect()
 
         result = asyncio.run(_run())
 
         console.success(f"Pack file created: {result.output_path}")
-        console.item(
-            f"{len(result.tables_imported)} tables, "
-            f"{len(result.scripts_imported)} scripts imported"
-        )
+        console.item(f"{len(result.tables_imported)} tables, {len(result.scripts_imported)} scripts imported")
 
     except Exception as e:
         console.error(f"Repacking failed: {e}")

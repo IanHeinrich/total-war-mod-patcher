@@ -12,7 +12,11 @@ env:
   PYTHON_VERSION: "3.12"
 
 jobs:
+  checks:
+    uses: ./.github/workflows/ci.yml
+
   build:
+    needs: checks
     strategy:
       matrix:
         include:

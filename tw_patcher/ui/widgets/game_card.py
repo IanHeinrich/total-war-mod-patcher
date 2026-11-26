@@ -1,7 +1,8 @@
-from PyQt6.QtCore import Qt, pyqtSignal, QSize
-from PyQt6.QtGui import QPixmap, QFont, QMouseEvent
-from PyQt6.QtWidgets import QFrame, QVBoxLayout, QLabel
-
+# pyright: reportCallIssue=false
+# (PyQt6 6.12 stubs reject pyqtSignal(<type>) calls; they are correct at runtime)
+from PyQt6.QtCore import QSize, Qt, pyqtSignal
+from PyQt6.QtGui import QFont, QMouseEvent, QPixmap
+from PyQt6.QtWidgets import QFrame, QLabel, QVBoxLayout
 
 CARD_WIDTH = 230
 CARD_IMAGE_HEIGHT = 107

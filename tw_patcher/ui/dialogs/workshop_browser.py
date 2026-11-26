@@ -1,16 +1,24 @@
 import webbrowser
 
-from PyQt6.QtCore import Qt, QSize, QPoint
+from PyQt6.QtCore import QPoint, QSize, Qt
 from PyQt6.QtWidgets import (
-    QDialog, QVBoxLayout, QHBoxLayout, QLabel, QLineEdit,
-    QPushButton, QListWidget, QListWidgetItem, QDialogButtonBox,
-    QProgressBar, QMenu,
+    QDialog,
+    QDialogButtonBox,
+    QHBoxLayout,
+    QLabel,
+    QLineEdit,
+    QListWidget,
+    QListWidgetItem,
+    QMenu,
+    QProgressBar,
+    QPushButton,
+    QVBoxLayout,
 )
 
 from ...clients.steam import SteamWorkshopClient
 from ...config import settings
 from ..styles import INFO_LABEL
-from ..widgets import WorkshopModWidget, ThumbnailLoader
+from ..widgets import ThumbnailLoader, WorkshopModWidget
 from ..workers import WorkshopMetadataWorker
 
 
@@ -55,9 +63,7 @@ class WorkshopBrowserDialog(QDialog):
         self.workshop_list.customContextMenuRequested.connect(self._show_context_menu)
         layout.addWidget(self.workshop_list)
 
-        button_box = QDialogButtonBox(
-            QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel
-        )
+        button_box = QDialogButtonBox(QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel)
         button_box.accepted.connect(self.accept)
         button_box.rejected.connect(self.reject)
         layout.addWidget(button_box)
@@ -113,9 +119,7 @@ class WorkshopBrowserDialog(QDialog):
 
     def _on_metadata_loaded(self, details: dict) -> None:
         self.progress_bar.hide()
-        self.info_label.setText(
-            f"{self.workshop_list.count()} workshop pack(s) available. Check items to select."
-        )
+        self.info_label.setText(f"{self.workshop_list.count()} workshop pack(s) available. Check items to select.")
         if not self._thumb_loader:
             self._thumb_loader = ThumbnailLoader(settings.workshop_thumbs_dir)
 

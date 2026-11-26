@@ -13,22 +13,24 @@ from ..main import cli
 
 @cli.command()
 @click.option(
-    '--source', '-s',
+    "--source",
+    "-s",
     multiple=True,
     type=click.Path(exists=True, dir_okay=False, path_type=Path),
-    help='Source .pack file (can specify up to 6 times)'
+    help="Source .pack file (can specify up to 6 times)",
 )
 @click.option(
-    '--output', '-o',
+    "--output",
+    "-o",
     type=click.Path(file_okay=False, path_type=Path),
     default=None,
-    help='Output directory (default: sources/)'
+    help="Output directory (default: sources/)",
 )
 @click.option(
-    '--sources-dir',
+    "--sources-dir",
     type=click.Path(file_okay=False, path_type=Path),
     default=None,
-    help='Override sources directory (alternative to --output)'
+    help="Override sources directory (alternative to --output)",
 )
 def extract(source: tuple[Path, ...], output: Path | None, sources_dir: Path | None) -> None:
     """Extract one or more mod pack files to TSV format.
@@ -65,8 +67,7 @@ def extract(source: tuple[Path, ...], output: Path | None, sources_dir: Path | N
         total_tables = sum(len(r.tables_exported) for r in results)
         total_scripts = sum(len(r.scripts_extracted) for r in results)
         console.success(
-            f"Extracted {len(source)} mod(s): {total_tables} tables, "
-            f"{total_scripts} scripts to: {target_dir}"
+            f"Extracted {len(source)} mod(s): {total_tables} tables, {total_scripts} scripts to: {target_dir}"
         )
         console.header("\nNext steps:")
         console.hint("1. Compare extracted tables/scripts in sources/")

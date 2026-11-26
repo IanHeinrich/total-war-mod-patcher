@@ -42,13 +42,11 @@ class ExtractionService:
         with console.status("Exporting tables..."):
             for table_path in db_table_paths:
                 relative_path = Path(table_path)
-                output_tsv = mod_output_dir / relative_path.with_suffix('.tsv')
+                output_tsv = mod_output_dir / relative_path.with_suffix(".tsv")
                 output_tsv.parent.mkdir(parents=True, exist_ok=True)
 
                 try:
-                    await self.client.export_tsv(
-                        pack_handle, table_path, normalize_rpfm_path(output_tsv)
-                    )
+                    await self.client.export_tsv(pack_handle, table_path, normalize_rpfm_path(output_tsv))
                     result.tables_exported.append(str(relative_path))
                     console.info(f"Exported {table_path}")
                 except Exception as e:
@@ -71,16 +69,13 @@ class ExtractionService:
 
         await self.client.close_pack_file(pack_handle)
         console.info(
-            f"Extraction complete: {len(result.tables_exported)} tables, "
-            f"{len(result.scripts_extracted)} scripts"
+            f"Extraction complete: {len(result.tables_exported)} tables, {len(result.scripts_extracted)} scripts"
         )
         return result
 
     async def extract_batch(self, pack_paths: list[Path], output_dir: Path) -> list[ExtractionResult]:
         if len(pack_paths) > self.settings.max_mods:
-            raise ValueError(
-                f"Too many source mods ({len(pack_paths)}). Maximum is {self.settings.max_mods}."
-            )
+            raise ValueError(f"Too many source mods ({len(pack_paths)}). Maximum is {self.settings.max_mods}.")
         if not pack_paths:
             raise ValueError("At least one source pack file is required.")
 
@@ -117,9 +112,9 @@ class ExtractionService:
 
     @staticmethod
     def _mod_name_from_path(pack_path: Path) -> str:
-        name = pack_path.stem.lstrip('@').replace('-', '_')
+        name = pack_path.stem.lstrip("@").replace("-", "_")
         # Sanitize: remove any path separators or traversal sequences
-        name = name.replace('..', '').replace('/', '').replace('\\', '')
+        name = name.replace("..", "").replace("/", "").replace("\\", "")
         if not name:
             raise ValueError(f"Cannot derive a safe mod name from: {pack_path.name}")
         return name
@@ -127,7 +122,7 @@ class ExtractionService:
     @staticmethod
     def _write_readme(output_dir: Path, results: list[ExtractionResult]) -> None:
         readme_path = output_dir / "README.txt"
-        with open(readme_path, 'w') as f:
+        with open(readme_path, "w") as f:
             f.write("Extracted Mod Data\n")
             f.write("==================\n\n")
             for result in results:
