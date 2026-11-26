@@ -3,6 +3,17 @@ from pathlib import Path
 
 
 @dataclass
+class ExtractionPlan:
+    """What extracting one pack would produce (``extract --dry-run``)."""
+
+    pack_path: Path
+    output_dir: Path
+    tables: list[str]
+    scripts: list[str]
+    replaces_existing: bool
+
+
+@dataclass
 class ExtractionResult:
     mod_name: str
     output_dir: Path
@@ -20,8 +31,8 @@ class ExtractionResult:
         return len(self.tables_failed) + len(self.scripts_failed)
 
     @property
-    def total_count(self) -> int:
-        return self.success_count + self.failure_count
+    def failures(self) -> list[tuple[str, str]]:
+        return self.tables_failed + self.scripts_failed
 
 
 @dataclass
@@ -42,5 +53,5 @@ class RepackResult:
         return len(self.tables_failed) + len(self.scripts_failed)
 
     @property
-    def total_count(self) -> int:
-        return self.success_count + self.failure_count
+    def failures(self) -> list[tuple[str, str]]:
+        return self.tables_failed + self.scripts_failed

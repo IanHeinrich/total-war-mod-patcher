@@ -1,5 +1,8 @@
 """Root CLI group definition."""
 
+import logging
+import sys
+
 import click
 
 from .. import __version__
@@ -23,6 +26,9 @@ def cli(verbose: bool, game: str | None) -> None:
     """Total War Mod Patcher - Extract and repack Total War mod pack files."""
     if verbose:
         console.verbose = True
+        # Surfaces the RPFM protocol trace from tw_patcher.clients (requests, responses, discarded frames)
+        logging.basicConfig(level=logging.DEBUG, format="%(name)s: %(message)s", stream=sys.stderr)
+        logging.getLogger("websockets").setLevel(logging.INFO)
     if game:
         settings.select_game(game)
         settings.save_user_config()

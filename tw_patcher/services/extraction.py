@@ -5,7 +5,7 @@ from ..clients.rpfm import RPFMClient
 from ..config import Settings
 from ..console import console
 from ..exceptions import ExtractionError, NoGameSelectedError
-from ..models.pack import ExtractionResult
+from ..models.pack import ExtractionPlan, ExtractionResult
 from ..utils import normalize_rpfm_path
 
 
@@ -13,6 +13,18 @@ class ExtractionService:
     def __init__(self, settings: Settings, client: RPFMClient):
         self.settings = settings
         self.client = client
+
+    async def _open(self, pack_path: Path) -> str:
+        if not self.settings.selected_game:
+            raise NoGameSelectedError()
+        await self.client.set_game_selected(self.settings.selected_game)
+        return await self.client.open_pack_file(normalize_rpfm_path(pack_path))
+
+    async def _list_extractable(self, pack_handle: str) -> tuple[list[str], list[str]]:
+        paths = await self.client.list_paths(pack_handle)
+        db_tables = [p for p in paths if p.startswith("db/")]
+        scripts = [p for p in paths if p.startswith("script/")]
+        return db_tables, scripts
 
     async def extract_pack(self, pack_path: Path, output_dir: Path) -> ExtractionResult:
         if not pack_path.exists():
@@ -25,59 +37,98 @@ class ExtractionService:
         console.info(f"Extracting {pack_path}...")
 
         with console.status("Opening pack file..."):
-            if not self.settings.selected_game:
-                raise NoGameSelectedError()
-            await self.client.set_game_selected(self.settings.selected_game)
-            pack_handle = await self.client.open_pack_file(str(pack_path))
+            pack_handle = await self._open(pack_path)
         console.info(f"Opened pack file: {pack_handle}")
 
-        db_table_paths = await self.client.list_db_table_paths(pack_handle)
-        console.info(f"Found {len(db_table_paths)} database tables")
+        try:
+            db_table_paths, script_paths = await self._list_extractable(pack_handle)
+            console.info(f"Found {len(db_table_paths)} database tables and {len(script_paths)} script files")
 
-        script_paths = await self.client.list_script_paths(pack_handle)
-        console.info(f"Found {len(script_paths)} script files")
+            result = ExtractionResult(mod_name=mod_name, output_dir=mod_output_dir)
 
-        result = ExtractionResult(mod_name=mod_name, output_dir=mod_output_dir)
+            with console.status("Exporting tables..."):
+                for table_path in db_table_paths:
+                    relative_path = Path(table_path)
+                    output_tsv = mod_output_dir / relative_path.with_suffix(".tsv")
+                    output_tsv.parent.mkdir(parents=True, exist_ok=True)
 
-        with console.status("Exporting tables..."):
-            for table_path in db_table_paths:
-                relative_path = Path(table_path)
-                output_tsv = mod_output_dir / relative_path.with_suffix(".tsv")
-                output_tsv.parent.mkdir(parents=True, exist_ok=True)
+                    try:
+                        await self.client.export_tsv(pack_handle, table_path, normalize_rpfm_path(output_tsv))
+                        result.tables_exported.append(str(relative_path))
+                        console.info(f"Exported {table_path}")
+                    except Exception as e:
+                        result.tables_failed.append((table_path, str(e)))
+                        console.error(f"Failed to export {table_path}: {e}")
 
-                try:
-                    await self.client.export_tsv(pack_handle, table_path, normalize_rpfm_path(output_tsv))
-                    result.tables_exported.append(str(relative_path))
-                    console.info(f"Exported {table_path}")
-                except Exception as e:
-                    result.tables_failed.append((table_path, str(e)))
-                    console.error(f"Failed to export {table_path}: {e}")
+            if script_paths:
+                with console.status("Extracting scripts..."):
+                    try:
+                        await self.client.extract_packed_files(
+                            pack_handle, script_paths, normalize_rpfm_path(mod_output_dir)
+                        )
+                        result.scripts_extracted.extend(script_paths)
+                        for sp in script_paths:
+                            console.info(f"Extracted {sp}")
+                    except Exception as e:
+                        for sp in script_paths:
+                            result.scripts_failed.append((sp, str(e)))
+                        console.error(f"Failed to extract scripts: {e}")
+        finally:
+            await self._close_quietly(pack_handle)
 
-        if script_paths:
-            with console.status("Extracting scripts..."):
-                try:
-                    await self.client.extract_packed_files(
-                        pack_handle, script_paths, normalize_rpfm_path(mod_output_dir)
-                    )
-                    result.scripts_extracted.extend(script_paths)
-                    for sp in script_paths:
-                        console.info(f"Extracted {sp}")
-                except Exception as e:
-                    for sp in script_paths:
-                        result.scripts_failed.append((sp, str(e)))
-                    console.error(f"Failed to extract scripts: {e}")
-
-        await self.client.close_pack_file(pack_handle)
         console.info(
             f"Extraction complete: {len(result.tables_exported)} tables, {len(result.scripts_extracted)} scripts"
         )
         return result
 
-    async def extract_batch(self, pack_paths: list[Path], output_dir: Path) -> list[ExtractionResult]:
+    async def _close_quietly(self, pack_handle: str) -> None:
+        """Release the RPFM pack handle without masking the error that got us here."""
+        try:
+            await self.client.close_pack_file(pack_handle)
+        except Exception as e:
+            console.warning(f"Could not close pack {pack_handle}: {e}")
+
+    def _check_batch(self, pack_paths: list[Path]) -> None:
         if len(pack_paths) > self.settings.max_mods:
             raise ValueError(f"Too many source mods ({len(pack_paths)}). Maximum is {self.settings.max_mods}.")
         if not pack_paths:
             raise ValueError("At least one source pack file is required.")
+        seen: dict[str, Path] = {}
+        for pack_path in pack_paths:
+            mod_name = self._mod_name_from_path(pack_path)
+            if mod_name in seen and seen[mod_name].resolve() != pack_path.resolve():
+                raise ValueError(
+                    f"{seen[mod_name].name} and {pack_path.name} would both extract to sources/{mod_name}/. "
+                    "Extract them in separate runs with different --output folders."
+                )
+            seen[mod_name] = pack_path
+
+    async def plan_batch(self, pack_paths: list[Path], output_dir: Path) -> list[ExtractionPlan]:
+        """What extract_batch would do, without writing anything."""
+        self._check_batch(pack_paths)
+        plans: list[ExtractionPlan] = []
+        for pack_path in dict.fromkeys(pack_paths):
+            mod_name = self._mod_name_from_path(pack_path)
+            pack_handle = await self._open(pack_path)
+            try:
+                db_tables, scripts = await self._list_extractable(pack_handle)
+            finally:
+                await self._close_quietly(pack_handle)
+            target = output_dir / mod_name
+            plans.append(
+                ExtractionPlan(
+                    pack_path=pack_path,
+                    output_dir=target,
+                    tables=db_tables,
+                    scripts=scripts,
+                    replaces_existing=target.exists(),
+                )
+            )
+        return plans
+
+    async def extract_batch(self, pack_paths: list[Path], output_dir: Path) -> list[ExtractionResult]:
+        self._check_batch(pack_paths)
+        pack_paths = list(dict.fromkeys(pack_paths))
 
         output_dir.mkdir(parents=True, exist_ok=True)
 
@@ -101,7 +152,7 @@ class ExtractionService:
         if total_failed > 0 and total_exported == 0:
             raise ExtractionError(
                 "All exports failed",
-                failed_tables=[t for r in results for t in r.tables_failed],
+                failed_tables=[t for r in results for t in r.tables_failed + r.scripts_failed],
             )
 
         self._write_readme(output_dir, results)

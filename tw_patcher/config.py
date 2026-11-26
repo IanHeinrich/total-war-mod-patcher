@@ -189,12 +189,14 @@ class Settings:
             return []
         return sorted(d.name for d in self.workspace_dir.iterdir() if d.is_dir() and not d.name.startswith("."))
 
-    def get_patch_mod_path(self, name: str) -> Path:
+    def get_patch_mod_path(self, name: str, workspace_dir: Path | None = None) -> Path:
+        """Path of patch ``name`` inside the workspace, refusing names that escape it."""
+        base = workspace_dir or self.workspace_dir
         if not name or any(c in name for c in ("..", "/", "\\", "\x00")):
             raise ValueError(f"Invalid patch mod name: {name!r}")
-        result = self.workspace_dir / name
+        result = base / name
 
-        if not result.resolve().is_relative_to(self.workspace_dir.resolve()):
+        if not result.resolve().is_relative_to(base.resolve()):
             raise ValueError(f"Invalid patch mod name: {name!r}")
         return result
 

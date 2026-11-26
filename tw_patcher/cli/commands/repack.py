@@ -7,7 +7,7 @@ import click
 from ...config import settings
 from ...console import console
 from ...services.repacking import RepackingService
-from .._helpers import create_client, create_system_service, require_game
+from .._helpers import create_client, create_system_service, report_failures, require_game
 from ..main import cli
 
 
@@ -33,8 +33,18 @@ from ..main import cli
     default=None,
     help="Override output directory for the .pack file",
 )
+@click.option(
+    "--allow-partial",
+    is_flag=True,
+    help="Save the pack even if some files failed to import (by default nothing is saved)",
+)
 def repack(
-    patch: str, output: Path | None, name: str | None, workspace_dir: Path | None, output_dir: Path | None
+    patch: str,
+    output: Path | None,
+    name: str | None,
+    workspace_dir: Path | None,
+    output_dir: Path | None,
+    allow_partial: bool,
 ) -> None:
     """Repack a patch mod from workspace/ into a .pack file.
 
@@ -47,7 +57,11 @@ def repack(
     settings.ensure_dirs()
 
     ws = workspace_dir or settings.workspace_dir
-    patch_path = ws / patch
+    try:
+        patch_path = settings.get_patch_mod_path(patch, ws)
+    except ValueError as e:
+        console.error(str(e))
+        sys.exit(1)
     if not patch_path.exists():
         available = (
             sorted(d.name for d in ws.iterdir() if d.is_dir() and not d.name.startswith(".")) if ws.exists() else []
@@ -74,15 +88,23 @@ def repack(
             await system.connect_client(client)
             try:
                 service = RepackingService(settings, client)
-                return await service.repack(patch, effective_output, name, workspace_dir=ws)
+                return await service.repack(
+                    patch, effective_output, name, workspace_dir=ws, allow_partial=allow_partial
+                )
             finally:
                 await client.disconnect()
 
         result = asyncio.run(_run())
-
-        console.success(f"Pack file created: {result.output_path}")
-        console.item(f"{len(result.tables_imported)} tables, {len(result.scripts_imported)} scripts imported")
-
     except Exception as e:
         console.error(f"Repacking failed: {e}")
+        report_failures(getattr(e, "failed_tables", []), "file(s)")
         sys.exit(1)
+
+    counts = f"{len(result.tables_imported)} tables, {len(result.scripts_imported)} scripts imported"
+    if result.failures:  # only reachable with --allow-partial
+        console.warning(f"Partial pack saved: {result.output_path} ({counts})")
+        report_failures(result.failures, "file(s)")
+        sys.exit(1)
+
+    console.success(f"Pack file created: {result.output_path}")
+    console.item(counts)
