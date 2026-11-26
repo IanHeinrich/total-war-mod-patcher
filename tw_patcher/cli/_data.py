@@ -13,6 +13,7 @@ import click
 from ..config import settings
 from ..console import console
 from ..data.index import Mod, ModIndex, ModNotFoundError
+from ..data.queries import resolve_table
 from ..data.schema import Schema, SchemaNotFoundError, load_schema
 
 json_option = click.option("--json", "as_json", is_flag=True, help="Print machine-readable JSON instead of text")
@@ -51,13 +52,7 @@ def open_schema(quiet: bool = False) -> Schema | None:
 
 def table_name(name: str, mods: list[Mod]) -> str:
     """Accept ``units_tables``, ``units`` or ``db/units_tables``; prefer what the mods actually contain."""
-    name = name.strip("/").removeprefix("db/").split("/")[0]
-    known = {t for m in mods for t in m.tables()}
-    if name in known or not name:
-        return name
-    if f"{name}_tables" in known:
-        return f"{name}_tables"
-    return name if name.endswith("_tables") else f"{name}_tables"
+    return resolve_table(name, mods)
 
 
 def jsonable(value: Any) -> Any:

@@ -7,6 +7,7 @@ from . import (
     config,  # noqa: F401
     extract,  # noqa: F401
     list,  # noqa: F401
+    mcp,  # noqa: F401
     new_patch,  # noqa: F401
     repack,  # noqa: F401
     replace,  # noqa: F401

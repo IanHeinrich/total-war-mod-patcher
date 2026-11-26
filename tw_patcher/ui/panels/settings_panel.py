@@ -159,9 +159,9 @@ class SettingsPanel(BasePanel):
             )
 
             if generate_helpers:
-                created = scaffold.scaffold()
-                if created:
-                    self._state.log(f"Generated {len(created)} helper file(s) in workspace", "success")
+                result = scaffold.scaffold()
+                if result.created:
+                    self._state.log(f"Generated {len(result.created)} helper file(s) in workspace", "success")
 
         self._open_btn.setEnabled(True)
         self._state.log(f"Modding workspace set: {path}", "success")

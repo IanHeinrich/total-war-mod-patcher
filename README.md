@@ -208,13 +208,30 @@ RPFM's server starts automatically when the tool connects or when RPFM is open.
 
 ---
 
-## AI-Assisted Patching
+## AI-Assisted Patching (MCP)
 
-The project includes instruction files that give AI assistants context about the modding workflow. AI is useful for comparing mods, explaining tables, and suggesting edits — but **always verify suggestions** before repacking, as AI frequently misaligns columns or invents non-existent keys.
+tw-patcher includes an [MCP](https://modelcontextprotocol.io) server, so Claude (or any MCP client)
+can investigate and patch mods through tools rather than by reading and hand-editing multi-megabyte
+TSV files.
 
-See `modding_docs/` for reference documentation on TSV format, schemas, and workflow.
+```bash
+tw-patcher scaffold                 # in your modding folder: docs, CLAUDE.md and .mcp.json
+claude mcp add tw-patcher -- tw-patcher mcp   # or register it yourself (Claude Code)
+```
 
----
+The tools cover the workspace layer:
+- **Inspect:** `workspace_status`, `list_tables`, `describe_table`, `query_rows`, `find_key`, `diff`,
+  `find_conflicts`, `validate_patch`.
+- **Edit patches safely:** `new_patch`, `copy_rows`, `upsert_rows`, `delete_rows`, `add_key_deletes`.
+  These only write inside `workspace/<patch>` and always keep RPFM's file format intact.
+- **Build:** `extract_packs`, `repack`, `rpfm_status`.
+
+RPFM 5 also serves its own MCP endpoint (`http://127.0.0.1:45127/mcp`) for pack-level work.
+`scaffold` registers it too when an RPFM 5 server is running (`--rpfm-mcp` forces it).
+`scaffold --update` refreshes the generated files without touching ones you've edited.
+
+The MCP server needs the `mcp` extra when running from source: `pip install -e ".[mcp]"`.
+As always, test the result in game before publishing.
 
 ## Troubleshooting
 
