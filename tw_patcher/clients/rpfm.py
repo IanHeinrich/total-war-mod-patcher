@@ -11,12 +11,13 @@ import json
 import logging
 import types
 import urllib.request
+from typing import Any
 
 import websockets
 from websockets import ClientConnection
 
 from ..constants import RPFM_DEFAULT_PORT, RPFM_DEFAULT_TIMEOUT, RPFM_WS_MAX_SIZE
-from .rpfm_protocols import LEGACY, JsonRpcProtocol, LegacyProtocol, RPFMProtocol, detect_protocol
+from .rpfm_protocols import JSONRPC, LEGACY, JsonRpcProtocol, LegacyProtocol, RPFMProtocol, detect_protocol
 
 logger = logging.getLogger(__name__)
 
@@ -141,6 +142,15 @@ class RPFMClient:
 
     async def save_pack_as(self, pack_handle: str, output_path: str) -> None:
         await self._proto.save_pack_as(pack_handle, output_path)
+
+    @property
+    def supports_diagnostics(self) -> bool:
+        return self._proto.name == JSONRPC
+
+    async def run_diagnostics(self, pack_handle: str, levels: list[str] | None = None) -> list[dict[str, Any]]:
+        """Run RPFM's diagnostics (RPFM 5+) and return the open pack's results, optionally only these levels:
+        dicts of path, level ("info" | "warning" | "error"), report_type, message, and columns/cells if given."""
+        return await self._proto.run_diagnostics(pack_handle, levels)
 
 
 class RPFMConnection:

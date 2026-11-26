@@ -1,4 +1,5 @@
 import asyncio
+import shutil
 import sys
 from pathlib import Path
 
@@ -39,6 +40,7 @@ from ..main import cli
     is_flag=True,
     help="Save the pack even if some files failed to import (by default nothing is saved)",
 )
+@click.option("--install", is_flag=True, help="Also copy the built pack into the selected game's data/ folder")
 def repack(
     patch: str,
     output: Path | None,
@@ -47,12 +49,14 @@ def repack(
     output_dir: Path | None,
     allow_partial: bool,
     no_validate: bool,
+    install: bool,
 ) -> None:
     """Repack a patch mod from workspace/ into a .pack file.
 
     Examples:\b
 
         tw-patcher repack --patch empire_rebalance
+        tw-patcher repack --patch empire_rebalance --install
         tw-patcher repack --patch elf_fix --workspace-dir D:\\Modding\\workspace
     """
     require_game()
@@ -113,6 +117,34 @@ def repack(
 
     console.success(f"Pack file created: {result.output_path}")
     console.item(counts)
+    if install:
+        _install(result.output_path)
+
+
+def _install(pack: Path) -> None:
+    """Copy the built pack into the selected game's data/ folder, replacing a pack of the same name."""
+    data_dir = settings.game_data_dir
+    if data_dir is None or not data_dir.is_dir():
+        reason = (
+            f"{data_dir} does not exist" if data_dir else f"no game folder is configured for {settings.selected_game}"
+        )
+        console.error(f"Not installed: {reason}. The pack is still at {pack}")
+        console.hint("Set the game folder: tw-patcher config set-game-dir <path to the game>")
+        sys.exit(1)
+    target = data_dir / pack.name
+    if target.exists() and target.resolve() == pack.resolve():
+        console.success(f"Already in data/: {target}")
+        return
+    replaced = target.exists()
+    try:
+        shutil.copy2(pack, target)
+    except OSError as e:
+        console.error(f"Could not copy the pack into {data_dir}: {e}. The pack is still at {pack}")
+        sys.exit(1)
+    if replaced:
+        console.success(f"Replaced {pack.name} in data/: {target}")
+    else:
+        console.success(f"Installed to {target}")
 
 
 def _validate_first(patch_path: Path) -> None:

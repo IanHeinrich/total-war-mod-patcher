@@ -19,7 +19,7 @@ from . import ron
 
 TABLE_SUFFIX = "_tables"
 SCHEMA_DIR_ENV = "TW_PATCHER_SCHEMA_DIR"
-_CACHE_FORMAT = 2  # 2: fields carry their colour group
+_CACHE_FORMAT = 3  # 2: colour groups; 3: ca_order
 
 SCHEMA_FILES: dict[str, str] = {
     "pharaoh_dynasties": "schema_ph_dyn.ron",
@@ -47,6 +47,8 @@ class Field:
     reference: tuple[str, str] | None
     # RPFM merges the r/g/b fields of one colour group into a single hex column in TSV exports
     colour_group: int | None = None
+    # Creative Assembly's column order; twad_key_deletes keys concatenate key columns in this order
+    ca_order: int = -1
 
 
 @dataclass(frozen=True)
@@ -58,6 +60,13 @@ class TableDefinition:
     @property
     def key_columns(self) -> list[str]:
         return [f.name for f in self.fields if f.is_key]
+
+    @property
+    def ca_key_columns(self) -> list[str]:
+        """Key columns in CA's order (``ca_order``), the order twad_key_deletes concatenates them in."""
+        keys = [(i, f) for i, f in enumerate(self.fields) if f.is_key]
+        keys.sort(key=lambda item: item[1].ca_order if item[1].ca_order >= 0 else 10_000 + item[0])
+        return [f.name for _, f in keys]
 
     def field(self, name: str) -> Field | None:
         for f in self.fields:
@@ -232,7 +241,16 @@ def _compact_field(f: dict[str, Any], patch: Any) -> list[Any]:
             elif not patch["is_reference"]:
                 ref_table, ref_column = None, None
     colour = f.get("is_part_of_colour")
-    return [f["name"], str(field_type), is_key, ref_table, ref_column, colour if isinstance(colour, int) else None]
+    ca_order = f.get("ca_order")
+    return [
+        f["name"],
+        str(field_type),
+        is_key,
+        ref_table,
+        ref_column,
+        colour if isinstance(colour, int) else None,
+        ca_order if isinstance(ca_order, int) else -1,
+    ]
 
 
 def _build_definitions(compact: _Compact) -> dict[str, dict[int, TableDefinition]]:
@@ -244,8 +262,10 @@ def _build_definitions(compact: _Compact) -> dict[str, dict[int, TableDefinition
                 table=table,
                 version=version,
                 fields=tuple(
-                    Field(name, field_type, is_key, (ref_table, ref_column) if ref_table is not None else None, colour)
-                    for name, field_type, is_key, ref_table, ref_column, colour in fields
+                    Field(
+                        name, field_type, is_key, (ref_table, ref_column) if ref_table is not None else None, colour, ca
+                    )
+                    for name, field_type, is_key, ref_table, ref_column, colour, ca in fields
                 ),
             )
         definitions[table] = by_version

@@ -259,6 +259,9 @@ def conflicts_cmd(
                 "dangling_total": len(report.dangling),
                 "dangling": capped(report.dangling, limit)[0],
                 "unchecked_targets": report.unchecked_targets,
+                "broken_by_deletes_total": len(report.broken_by_deletes),
+                "broken_by_deletes": capped(report.broken_by_deletes, limit)[0],
+                "deletes_without_match": report.deletes_without_match,
             }
         )
         return
@@ -282,6 +285,21 @@ def conflicts_cmd(
             console.plain(f"  {d.source} {'|'.join(d.key)}: {d.column}={d.value!r} not in {d.target}")
         if hidden:
             console.hint(f"... {hidden} more")
+        console.header(f"\nKey deletes that break references: {len(report.broken_by_deletes)}")
+        shown, hidden = capped(report.broken_by_deletes, limit)
+        for b in shown:
+            console.plain(
+                f"  {b.delete} deletes {b.table} {b.key!r}, still used by {b.referenced_by} "
+                f"{'|'.join(b.referencing_key)} ({b.column})"
+            )
+        if hidden:
+            console.hint(f"... {hidden} more")
+        if report.broken_by_deletes:
+            console.hint("The game crashes on load when a deleted row is still referenced.")
+        if report.deletes_without_match:
+            console.header(f"\nKey deletes that match nothing: {len(report.deletes_without_match)}")
+            for u in capped(report.deletes_without_match, limit)[0]:
+                console.plain(f"  {u.delete}: {u.table} {u.key!r}")
         if report.unchecked_targets:
             console.hint(
                 f"Not checked ({len(report.unchecked_targets)} referenced tables are in none of these mods; "

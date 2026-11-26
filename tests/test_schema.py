@@ -153,10 +153,12 @@ def test_fields_types_keys_and_references(schema_dir: Path) -> None:
     assert units is not None
 
     assert units.key_columns == ["key"]
-    assert units.field("key") == Field("key", "StringU8", True, None)
-    assert units.field("ability") == Field("ability", "OptionalStringU8", False, ("abilities_tables", "key"))
-    assert units.field("cost") == Field("cost", "I32", False, None)
-    assert units.field("waypoints") == Field("waypoints", "SequenceU32", False, None)
+    assert units.field("key") == Field("key", "StringU8", True, None, ca_order=0)
+    assert units.field("ability") == Field(
+        "ability", "OptionalStringU8", False, ("abilities_tables", "key"), ca_order=1
+    )
+    assert units.field("cost") == Field("cost", "I32", False, None, ca_order=2)
+    assert units.field("waypoints") == Field("waypoints", "SequenceU32", False, None, ca_order=3)
     assert units.field("onscreen_name") is None  # localised fields are not table columns
 
 

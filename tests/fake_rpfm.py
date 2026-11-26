@@ -51,7 +51,7 @@ LEGACY_TO_METHOD = {
 }
 
 # JSON-RPC methods that answer {"job": n} and report their outcome through job.wait.
-JOB_METHODS = {"session.set_game"}
+JOB_METHODS = {"session.set_game", "dependencies.rebuild", "diagnostics.run"}
 
 
 def write_pack(path: Path, files: dict[str, str]) -> Path:
@@ -88,6 +88,13 @@ class FakeRPFM:
         # (command, substring of the JSON-encoded params) -> error message
         self.failures: dict[tuple[str, str], str] = {}
         self.game: str | None = None
+        # jsonrpc only. Results diagnostics.run reports for every open pack, in DiagnosticResult shape
+        # minus "pack" (filled in with each pack's key), e.g. {"path", "checked", "report_type", "level", "message"}.
+        self.diagnostics: list[dict[str, Any]] = []
+        self.dependencies_loaded = False
+        # When set, loading dependencies fails with this reason (as a missing dependencies cache would).
+        self.dependencies_error: str | None = None
+        self._diagnosed: list[dict[str, Any]] | None = None
         self._packs: dict[str, _OpenPack] = {}
         self._handles = itertools.count(1)
         self._jobs: dict[int, dict[str, Any]] = {}
@@ -252,7 +259,54 @@ class FakeRPFM:
 
     def _rpc_session_set_game(self, params: dict) -> dict:
         self.game = params["game"]
+        if params.get("rebuild_dependencies", True) and self.dependencies_error is None:
+            self.dependencies_loaded = True
         return {"game": self.game, "schema_loaded": True, "dependencies": None, "packs": []}
+
+    def _session_status(self) -> dict:
+        return {
+            "game": self.game,
+            "schema_loaded": True,
+            "dependencies": {
+                "vanilla_loaded": self.dependencies_loaded,
+                "assembly_kit_loaded": False,
+                "parent_files": 0,
+                "error": None if self.dependencies_loaded else self.dependencies_error,
+            },
+            "packs": [self._summary(key) for key in self._packs],
+        }
+
+    def _rpc_session_status(self, _params: dict) -> dict:
+        return self._session_status()
+
+    def _rpc_dependencies_rebuild(self, _params: dict) -> dict:
+        if self.dependencies_error is None:
+            self.dependencies_loaded = True
+        return self._session_status()
+
+    def _rpc_diagnostics_run(self, _params: dict) -> dict:
+        if not self.dependencies_loaded:
+            raise _RpcError(-32005, "dependencies_not_loaded", "The dependencies of the selected game aren't loaded")
+        self._diagnosed = [{**item, "pack": key} for key in self._packs for item in self.diagnostics]
+        by_level: dict[str, int] = {}
+        by_type: dict[str, int] = {}
+        for item in self._diagnosed:
+            by_level[item["level"]] = by_level.get(item["level"], 0) + 1
+            by_type[item["report_type"]] = by_type.get(item["report_type"], 0) + 1
+        return {"total": len(self._diagnosed), "by_level": by_level, "by_type": by_type}
+
+    def _rpc_diagnostics_list(self, params: dict) -> dict:
+        if self._diagnosed is None:
+            raise _RpcError(-32009, "diagnostics_not_run", "No diagnostics have been run")
+        results = [
+            r
+            for r in self._diagnosed
+            if (params.get("pack") is None or r["pack"] == params["pack"])
+            and (not params.get("levels") or r["level"] in params["levels"])
+            and r["path"].startswith(params.get("path_prefix", ""))
+        ]
+        offset, limit = params.get("offset", 0), params.get("limit") or 100
+        return {"results": results[offset : offset + limit], "total": len(results)}
 
     def _rpc_session_disconnect(self, _params: dict) -> dict:
         return {}

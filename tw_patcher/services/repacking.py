@@ -5,7 +5,7 @@ from ..config import Settings
 from ..console import console
 from ..exceptions import NoGameSelectedError, RepackError
 from ..models.pack import RepackResult
-from ..utils import normalize_rpfm_path, to_rpfm_container_path
+from ..utils import normalize_rpfm_path, tsv_to_container_path
 
 
 class RepackingService:
@@ -65,7 +65,7 @@ class RepackingService:
             if tsv_files:
                 with console.status("Importing tables..."):
                     for tsv_file in tsv_files:
-                        table_path = to_rpfm_container_path(tsv_file.relative_to(source_dir))
+                        table_path = tsv_to_container_path(tsv_file.relative_to(source_dir))
                         await self._add(pack_handle, tsv_file, table_path, result.tables_imported, result.tables_failed)
 
             if script_files:

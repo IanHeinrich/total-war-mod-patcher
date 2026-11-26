@@ -227,7 +227,8 @@ def find_conflicts(
     mods: list[str], context: list[str] | None = None, check_references: bool = True, limit: int = 100
 ) -> dict[str, Any]:
     """Where MODS (load order, first wins) step on each other: whole-file overrides, primary keys defined by
-    several mods (with the winner and differing columns), and references to keys none of them define.
+    several mods (with the winner and differing columns), references to keys none of them define, and
+    twad_key_deletes rows that remove something still referenced (a load crash) or match nothing.
     context=[...] adds mods (e.g. an extracted vanilla db) used only to resolve references."""
     index = _index()
     selected = [_mod(index, m) for m in mods]
@@ -248,6 +249,9 @@ def find_conflicts(
         "dangling": shown_d,
         "dangling_truncated": trunc_d,
         "unchecked_reference_targets": report.unchecked_targets,
+        "broken_by_deletes_total": len(report.broken_by_deletes),
+        "broken_by_deletes": [vars(b) for b in _cap(report.broken_by_deletes, limit)[0]],
+        "deletes_without_match": [vars(u) for u in report.deletes_without_match],
     }
 
 
@@ -366,25 +370,41 @@ async def rpfm_status() -> dict[str, Any]:
 
 
 @tool()
-async def extract_packs(packs: list[str]) -> dict[str, Any]:
-    """Extract .pack files (absolute paths, up to 6) into sources/<mod>/ as TSV tables and scripts.
-    Replaces a previous extraction of the same pack."""
+async def extract_packs(
+    packs: list[str] | None = None,
+    workshop_ids: list[str] | None = None,
+    vanilla: bool = False,
+    tables: list[str] | None = None,
+) -> dict[str, Any]:
+    """Extract mods into sources/<mod>/: db tables and text/*.loc as TSV, scripts as files. Give .pack paths
+    (absolute) and/or Steam Workshop item IDs (up to 6 packs in total). vanilla=True also extracts the game's
+    data/db.pack into sources/vanilla/ (needed to check references against the base game; use tables=[...]
+    to export only some tables, it has ~1600). Replaces a previous extraction of the same pack."""
     from pathlib import Path
 
-    from .services.extraction import ExtractionService
+    from .services.extraction import ExtractionService, vanilla_pack_path, workshop_pack_paths
 
-    paths = [Path(p) for p in packs]
+    paths = [Path(p) for p in packs or []]
     for p in paths:
         if not p.is_file():
             raise ValueError(f"Not a file: {p}")
+    paths += workshop_pack_paths(settings, list(workshop_ids or []))
+    vanilla_pack = vanilla_pack_path(settings) if vanilla else None
+    if not paths and not vanilla_pack:
+        raise ValueError("Give packs, workshop_ids or vanilla=True")
     settings.ensure_dirs()
-    results = await _with_client(lambda c: ExtractionService(settings, c).extract_batch(paths, settings.sources_dir))
+    results = await _with_client(
+        lambda c: ExtractionService(settings, c).extract_batch(
+            paths, settings.sources_dir, tables or None, vanilla_pack
+        )
+    )
     return {
         "mods": [
             {
                 "mod": f"sources/{r.mod_name}",
                 "tables": len(r.tables_exported),
                 "scripts": len(r.scripts_extracted),
+                "locs": len(r.locs_exported),
                 "failed": [{"path": p, "error": e} for p, e in r.failures],
             }
             for r in results

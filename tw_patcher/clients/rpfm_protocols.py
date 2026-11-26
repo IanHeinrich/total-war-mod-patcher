@@ -29,6 +29,20 @@ logger = logging.getLogger(__name__)
 LEGACY = "legacy"
 JSONRPC = "jsonrpc"
 
+DIAGNOSTICS_UNSUPPORTED = "RPFM diagnostics need RPFM 5 or newer (found legacy protocol)"
+DIAGNOSTICS_TIMEOUT = 600  # seconds; loading dependencies and checking a large pack can take minutes
+DIAGNOSTIC_LEVELS: tuple[str, ...] = ("info", "warning", "error")
+
+
+class RPFMRequestError(RPFMError):
+    """A JSON-RPC ``error`` reply (or failed job), keeping its ``code`` and ``data.kind``."""
+
+    def __init__(self, error: Any):
+        super().__init__(_error_message(error))
+        self.code = error.get("code") if isinstance(error, dict) else None
+        data = error.get("data") if isinstance(error, dict) else None
+        self.kind = data.get("kind") if isinstance(data, dict) else None
+
 
 def detect_protocol(greeting: Any) -> tuple[str | None, int | None]:
     """Return (protocol, session_id) for the server's first frame, or (None, None) if unrecognised."""
@@ -93,6 +107,9 @@ class RPFMProtocol:
         raise NotImplementedError
 
     async def new_pack(self) -> str:
+        raise NotImplementedError
+
+    async def run_diagnostics(self, pack_handle: str, levels: list[str] | None = None) -> list[dict[str, Any]]:
         raise NotImplementedError
 
 
@@ -200,6 +217,9 @@ class LegacyProtocol(RPFMProtocol):
             return str(result["String"])
         raise RPFMError(f"Unexpected response from NewPack: {result}")
 
+    async def run_diagnostics(self, pack_handle: str, levels: list[str] | None = None) -> list[dict[str, Any]]:
+        raise RPFMError(DIAGNOSTICS_UNSUPPORTED)
+
 
 class JsonRpcProtocol(RPFMProtocol):
     name = JSONRPC
@@ -232,7 +252,7 @@ class JsonRpcProtocol(RPFMProtocol):
                     logger.debug(f"Discarding message with id={response.get('id')}")
 
             if "error" in response:
-                raise RPFMError(_error_message(response["error"]))
+                raise RPFMRequestError(response["error"])
 
             logger.debug(f"<- {method} OK")
             return response.get("result")
@@ -244,10 +264,11 @@ class JsonRpcProtocol(RPFMProtocol):
         except Exception as e:
             raise RuntimeError(f"Error executing '{method}': {e}") from e
 
-    async def call_job(self, method: str, params: dict[str, Any]) -> Any:
-        """Run a job-style method to completion within ``self.timeout`` and return its result."""
+    async def call_job(self, method: str, params: dict[str, Any], timeout: float | None = None) -> Any:
+        """Run a job-style method to completion within ``timeout`` (default ``self.timeout``) and return its result."""
+        timeout = self.timeout if timeout is None else timeout
         loop = asyncio.get_running_loop()
-        deadline = loop.time() + self.timeout
+        deadline = loop.time() + timeout
         started = await self.call(method, params)
         if not (isinstance(started, dict) and "job" in started):
             return started  # answered directly instead of as a job
@@ -256,7 +277,7 @@ class JsonRpcProtocol(RPFMProtocol):
         while True:
             remaining = deadline - loop.time()
             if remaining <= 0:
-                raise TimeoutError(f"Command '{method}' timed out after {self.timeout}s")
+                raise TimeoutError(f"Command '{method}' timed out after {timeout:g}s")
             wait_secs = max(1, int(remaining))
             # job.wait blocks server-side for up to wait_secs, so give the reply a little longer to arrive.
             status = await self.call("job.wait", {"job": job, "timeout_secs": wait_secs}, timeout=wait_secs + 5)
@@ -264,7 +285,7 @@ class JsonRpcProtocol(RPFMProtocol):
             if state == "finished":
                 return status.get("result")
             if state == "failed":
-                raise RPFMError(_error_message(status.get("error")))
+                raise RPFMRequestError(status.get("error"))
             if state == "cancelled":
                 raise RPFMError(f"RPFM job '{method}' was cancelled")
             if state not in ("queued", "running"):
@@ -343,6 +364,73 @@ class JsonRpcProtocol(RPFMProtocol):
             raise RPFMError(str(result["error"]))
         if dest_path not in (result.get("added") or []):
             raise RPFMError(f"RPFM did not add {dest_path} (not added: {result.get('not_added') or [source_path]})")
+
+    async def run_diagnostics(self, pack_handle: str, levels: list[str] | None = None) -> list[dict[str, Any]]:
+        # Shapes follow the RPFM manual (server/methods/diagnostics, session, ws-protocol); not yet checked
+        # against a live RPFM 5.3.3: the SessionStatus.dependencies fields, dependencies.rebuild loading a
+        # cache that set_game (rebuild_dependencies=false) skipped, and DiagnosticResult.pack being the pack key.
+        await self._ensure_dependencies()
+        try:
+            # Checks every open pack; we only ever have this one open.
+            await self.call_job("diagnostics.run", {}, timeout=max(self.timeout, DIAGNOSTICS_TIMEOUT))
+        except RPFMRequestError as e:
+            if e.kind == "dependencies_not_loaded":
+                raise RPFMError(_dependencies_hint(str(e))) from e
+            raise
+
+        items: list[dict[str, Any]] = []
+        while True:
+            params: dict[str, Any] = {"pack": pack_handle, "offset": len(items), "limit": self.PAGE_SIZE}
+            if levels:
+                params["levels"] = levels
+            try:
+                page = await self.call("diagnostics.list", params)
+            except RPFMRequestError as e:
+                if e.kind == "diagnostics_not_run":
+                    raise RPFMError(
+                        "RPFM has no diagnostics results (the check was cancelled or never ran); try again"
+                    ) from e
+                raise
+            if not (isinstance(page, dict) and isinstance(page.get("results"), list)):
+                raise RPFMError(f"Unexpected response from diagnostics.list: {page}")
+            results: list[Any] = page["results"]
+            items += [_normalize_diagnostic(r) for r in results if isinstance(r, dict)]
+            if not results or len(items) >= int(page.get("total", 0)):
+                return items
+
+    async def _ensure_dependencies(self) -> None:
+        """Load the game's dependencies (skipped by set_game for speed) so references can be checked."""
+        status = await self.call("session.status", {})
+        deps = status.get("dependencies") if isinstance(status, dict) else None
+        if isinstance(deps, dict) and deps.get("vanilla_loaded"):
+            return
+        status = await self.call_job("dependencies.rebuild", {}, timeout=max(self.timeout, DIAGNOSTICS_TIMEOUT))
+        deps = status.get("dependencies") if isinstance(status, dict) else None
+        if isinstance(deps, dict) and not deps.get("vanilla_loaded"):
+            raise RPFMError(_dependencies_hint(deps.get("error") or "vanilla files not loaded"))
+
+
+def _dependencies_hint(reason: str) -> str:
+    return (
+        f"RPFM could not load the game's dependencies, which diagnostics need: {reason}. "
+        "Generate the dependencies cache in RPFM (Special Stuff > your game > Generate Dependencies Cache) "
+        "and try again."
+    )
+
+
+def _normalize_diagnostic(result: dict[str, Any]) -> dict[str, Any]:
+    """A DiagnosticResult as {path, level, report_type, message, columns?, cells?}."""
+    item: dict[str, Any] = {
+        "path": str(result.get("path") or ""),
+        "level": str(result.get("level") or "info").lower(),
+        "report_type": str(result.get("report_type") or ""),
+        "message": str(result.get("message") or ""),
+    }
+    if result.get("columns"):
+        item["columns"] = list(result["columns"])
+    if result.get("cells"):
+        item["cells"] = result["cells"]
+    return item
 
 
 def _error_message(error: Any) -> str:
