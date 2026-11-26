@@ -1,8 +1,25 @@
+import sys
 from collections.abc import Generator
 from contextlib import contextmanager
 
 from rich.console import Console as RichConsole
 from rich.theme import Theme
+
+
+def _force_utf8_streams() -> None:
+    """Output uses characters such as ✓ and →. On Windows a redirected stdout
+    (a pipe, a file, an LLM tool capturing output) defaults to cp1252 and
+    crashes on them, so switch non-UTF-8 streams to UTF-8."""
+    for stream in (sys.stdout, sys.stderr):
+        encoding = (getattr(stream, "encoding", None) or "").lower().replace("-", "")
+        if encoding != "utf8" and hasattr(stream, "reconfigure"):
+            try:
+                stream.reconfigure(encoding="utf-8", errors="replace")  # type: ignore[union-attr]
+            except (OSError, ValueError):
+                pass
+
+
+_force_utf8_streams()
 
 _theme = Theme(
     {

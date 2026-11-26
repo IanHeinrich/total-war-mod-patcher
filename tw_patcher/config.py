@@ -20,7 +20,8 @@ from .models.workshop import WorkshopMod
 class Settings:
     max_mods: int = MAX_SOURCE_MODS
     rpfm_host: str = "127.0.0.1"
-    rpfm_port: int = RPFM_DEFAULT_PORT
+    # TW_PATCHER_RPFM_PORT lets tests (or a non-default RPFM setup) point at another server
+    rpfm_port: int = field(default_factory=lambda: int(os.environ.get("TW_PATCHER_RPFM_PORT") or RPFM_DEFAULT_PORT))
     rpfm_timeout: int = RPFM_DEFAULT_TIMEOUT
     rpfm_startup_attempts: int = RPFM_STARTUP_ATTEMPTS
     rpfm_startup_wait_seconds: float = RPFM_STARTUP_WAIT
@@ -37,7 +38,14 @@ class Settings:
 
     @staticmethod
     def _app_data_dir() -> Path:
-        """Platform-appropriate application data directory."""
+        """Platform-appropriate application data directory.
+
+        ``TW_PATCHER_HOME`` overrides it (used by the test suite to keep the
+        real user config untouched).
+        """
+        override = os.environ.get("TW_PATCHER_HOME")
+        if override:
+            return Path(override)
         system = platform.system()
         if system == "Windows":
             base = Path(os.environ.get("LOCALAPPDATA", Path.home() / "AppData" / "Local"))

@@ -2,6 +2,7 @@
 
 import click
 
+from .. import __version__
 from ..config import settings
 from ..console import console
 from ..models.game import GAME_KEYS
@@ -9,6 +10,7 @@ from ._rich import RichGroup
 
 
 @click.group(cls=RichGroup)
+@click.version_option(__version__, "--version", prog_name="tw-patcher")
 @click.option("-v", "--verbose", is_flag=True, help="Enable verbose logging")
 @click.option(
     "-g",

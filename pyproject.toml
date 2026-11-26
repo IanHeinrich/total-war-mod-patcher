@@ -17,6 +17,8 @@ dependencies = [
 [project.optional-dependencies]
 dev = [
     "pytest>=7.0",
+    "ruff>=0.6",
+    "pyright>=1.1.380",
 ]
 build = [
     "pyinstaller>=6.0",
@@ -30,6 +32,10 @@ tw-patcher-gui = "tw_patcher.ui.app:launch_ui"
 
 [tool.setuptools.packages.find]
 include = ["tw_patcher*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-ra"
 
 [tool.ruff]
 line-length = 120

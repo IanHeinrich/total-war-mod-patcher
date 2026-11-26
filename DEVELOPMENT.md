@@ -142,6 +142,30 @@ tw-patcher ui                 # GUI
 tw-patcher --game attila check  # Set game + verify RPFM
 ```
 
+## Testing and Checks
+
+```bash
+pytest -q                     # outside-in tests, no RPFM needed
+ruff check . && ruff format --check .
+pyright
+```
+
+Tests are outside-in: each one runs `python -m tw_patcher ...` in a subprocess
+against a temporary modding root and asserts on exit code, output and files on
+disk. RPFM is replaced by `tests/fake_rpfm.py`, a small WebSocket server that
+speaks the same protocol and stores "packs" as JSON manifests, so a test can
+build an input pack and inspect exactly what tw-patcher wrote. Write unit tests
+only for logic that is genuinely intricate (parsers, merge rules).
+
+Two environment variables keep tests away from your real setup and are also
+usable by hand: `TW_PATCHER_HOME` replaces the app data directory (config,
+caches, default modding root) and `TW_PATCHER_RPFM_PORT` points at a different
+RPFM server.
+
+CI (`.github/workflows/ci.yml`) runs the same checks on every push and pull
+request, on Windows and Linux; the release workflow runs them before building
+installers.
+
 ## Adding a New Game
 
 If RPFM adds support for a new game:

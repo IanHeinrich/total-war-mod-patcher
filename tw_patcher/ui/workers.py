@@ -1,3 +1,5 @@
+# pyright: reportCallIssue=false
+# (PyQt6 6.12 stubs reject pyqtSignal(<type>) calls; they are correct at runtime)
 import asyncio
 import traceback
 from pathlib import Path
