@@ -1,9 +1,9 @@
-from dataclasses import dataclass, field
 import json
 import os
-from pathlib import Path
 import platform
 import re
+from dataclasses import dataclass, field
+from pathlib import Path
 
 from .constants import (
     MAX_SOURCE_MODS,
@@ -12,7 +12,7 @@ from .constants import (
     RPFM_STARTUP_ATTEMPTS,
     RPFM_STARTUP_WAIT,
 )
-from .models.game import GameDef, GAMES, get_game
+from .models.game import GAMES, GameDef, get_game
 from .models.workshop import WorkshopMod
 
 
@@ -118,24 +118,30 @@ class Settings:
 
         system = platform.system()
         if system == "Windows":
-            paths.extend([
-                Path(r"C:\Program Files\RPFM\rpfm_server.exe"),
-                Path(r"C:\Program Files\RPFM\rpfm_ui.exe"),
-                Path(r"C:\Program Files (x86)\RPFM\rpfm_server.exe"),
-                Path.home() / "AppData" / "Local" / "RPFM" / "rpfm_server.exe",
-                Path.home() / "AppData" / "Local" / "RPFM" / "rpfm_ui.exe",
-            ])
+            paths.extend(
+                [
+                    Path(r"C:\Program Files\RPFM\rpfm_server.exe"),
+                    Path(r"C:\Program Files\RPFM\rpfm_ui.exe"),
+                    Path(r"C:\Program Files (x86)\RPFM\rpfm_server.exe"),
+                    Path.home() / "AppData" / "Local" / "RPFM" / "rpfm_server.exe",
+                    Path.home() / "AppData" / "Local" / "RPFM" / "rpfm_ui.exe",
+                ]
+            )
         elif system == "Linux":
-            paths.extend([
-                Path("/usr/bin/rpfm"),
-                Path("/usr/local/bin/rpfm"),
-                Path.home() / ".local" / "bin" / "rpfm",
-            ])
+            paths.extend(
+                [
+                    Path("/usr/bin/rpfm"),
+                    Path("/usr/local/bin/rpfm"),
+                    Path.home() / ".local" / "bin" / "rpfm",
+                ]
+            )
         elif system == "Darwin":
-            paths.extend([
-                Path("/Applications/RPFM.app/Contents/MacOS/rpfm"),
-                Path.home() / "Applications" / "RPFM.app" / "Contents" / "MacOS" / "rpfm",
-            ])
+            paths.extend(
+                [
+                    Path("/Applications/RPFM.app/Contents/MacOS/rpfm"),
+                    Path.home() / "Applications" / "RPFM.app" / "Contents" / "MacOS" / "rpfm",
+                ]
+            )
         return paths
 
     def ensure_dirs(self) -> None:
@@ -166,22 +172,19 @@ class Settings:
                 continue
             packs = sorted(entry.glob("*.pack"))
             if packs:
-                mods.append(WorkshopMod(workshop_id=entry.name, pack_paths=packs)) # pyright: ignore[reportCallIssue]
+                mods.append(WorkshopMod(workshop_id=entry.name, pack_paths=packs))  # pyright: ignore[reportCallIssue]
         return mods
 
     def list_patch_mods(self) -> list[str]:
         if not self.workspace_dir.exists():
             return []
-        return sorted(
-            d.name for d in self.workspace_dir.iterdir()
-            if d.is_dir() and not d.name.startswith('.')
-        )
+        return sorted(d.name for d in self.workspace_dir.iterdir() if d.is_dir() and not d.name.startswith("."))
 
     def get_patch_mod_path(self, name: str) -> Path:
-        if not name or any(c in name for c in ('..', '/', '\\', '\x00')):
+        if not name or any(c in name for c in ("..", "/", "\\", "\x00")):
             raise ValueError(f"Invalid patch mod name: {name!r}")
         result = self.workspace_dir / name
-        
+
         if not result.resolve().is_relative_to(self.workspace_dir.resolve()):
             raise ValueError(f"Invalid patch mod name: {name!r}")
         return result
@@ -205,7 +208,7 @@ class Settings:
 
     def detect_installed_games(self) -> dict[str, Path]:
         installed: dict[str, Path] = {}
-        for key, game_def in GAMES.items():
+        for key in GAMES:
             if key in self.game_dirs:
                 installed[key] = self.game_dirs[key]
             else:
@@ -251,10 +254,12 @@ class Settings:
             paths = []
             if steam_path:
                 paths.append(steam_path / "steamapps" / "libraryfolders.vdf")
-            paths.extend([
-                Path(r"C:\Program Files (x86)\Steam\steamapps\libraryfolders.vdf"),
-                Path(r"C:\Program Files\Steam\steamapps\libraryfolders.vdf"),
-            ])
+            paths.extend(
+                [
+                    Path(r"C:\Program Files (x86)\Steam\steamapps\libraryfolders.vdf"),
+                    Path(r"C:\Program Files\Steam\steamapps\libraryfolders.vdf"),
+                ]
+            )
             return paths
         elif system == "Linux":
             return [
@@ -269,6 +274,7 @@ class Settings:
             return None
         try:
             import winreg
+
             key = winreg.OpenKey(winreg.HKEY_LOCAL_MACHINE, r"SOFTWARE\WOW6432Node\Valve\Steam")
             value, _ = winreg.QueryValueEx(key, "InstallPath")
             winreg.CloseKey(key)

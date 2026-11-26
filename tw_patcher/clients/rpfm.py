@@ -12,7 +12,7 @@ import asyncio
 import json
 import logging
 import types
-from typing import Any, Optional
+from typing import Any
 
 import websockets
 from websockets import ClientConnection
@@ -29,16 +29,15 @@ class RPFMClient:
         self.port = port
         self.timeout = timeout
         self.ws_url = f"ws://{host}:{port}/ws"
-        self.connection: Optional[ClientConnection] = None
-        self.session_id: Optional[int] = None
+        self.connection: ClientConnection | None = None
+        self.session_id: int | None = None
         self._message_id = 0
 
     async def connect(self) -> None:
         try:
             logger.info(f"Connecting to RPFM server at {self.ws_url}...")
             self.connection = await asyncio.wait_for(
-                websockets.connect(self.ws_url, max_size=RPFM_WS_MAX_SIZE),
-                timeout=self.timeout
+                websockets.connect(self.ws_url, max_size=RPFM_WS_MAX_SIZE), timeout=self.timeout
             )
             raw = await asyncio.wait_for(self.connection.recv(), timeout=self.timeout)
             msg = json.loads(raw)
@@ -49,9 +48,9 @@ class RPFMClient:
             else:
                 logger.warning(f"Unexpected first message from RPFM server: {msg}")
         except asyncio.TimeoutError:
-            raise ConnectionError(f"Timed out connecting to RPFM server ({self.timeout}s)")
+            raise ConnectionError(f"Timed out connecting to RPFM server ({self.timeout}s)") from None
         except Exception as e:
-            raise ConnectionError(f"Failed to connect to RPFM server: {e}")
+            raise ConnectionError(f"Failed to connect to RPFM server: {e}") from e
 
     async def disconnect(self) -> None:
         if self.connection:
@@ -90,10 +89,7 @@ class RPFMClient:
             await self.connection.send(json.dumps(message))
 
             while True:
-                raw = await asyncio.wait_for(
-                    self.connection.recv(),
-                    timeout=self.timeout
-                )
+                raw = await asyncio.wait_for(self.connection.recv(), timeout=self.timeout)
                 response = json.loads(raw)
                 if response.get("id") == message_id:
                     break
@@ -110,9 +106,9 @@ class RPFMClient:
         except RPFMError:
             raise
         except asyncio.TimeoutError:
-            raise TimeoutError(f"Command '{command}' timed out after {self.timeout}s")
+            raise TimeoutError(f"Command '{command}' timed out after {self.timeout}s") from None
         except Exception as e:
-            raise RuntimeError(f"Error executing '{command}': {e}")
+            raise RuntimeError(f"Error executing '{command}': {e}") from e
 
     async def set_game_selected(self, game_key: str) -> None:
         await self.send_command("SetGameSelected", [game_key, False])
@@ -133,10 +129,7 @@ class RPFMClient:
         if isinstance(result, dict) and "ContainerInfoVecRFileInfo" in result:
             container_and_files: Any = result["ContainerInfoVecRFileInfo"]
             _container_info, file_list = container_and_files
-            return [
-                f["path"] for f in file_list
-                if isinstance(f, dict) and f.get("path", "").startswith("db/")
-            ]
+            return [f["path"] for f in file_list if isinstance(f, dict) and f.get("path", "").startswith("db/")]
         raise RPFMError(f"Unexpected response from GetPackFileDataForTreeView: {result}")
 
     async def list_script_paths(self, pack_handle: str) -> list[str]:
@@ -144,10 +137,7 @@ class RPFMClient:
         if isinstance(result, dict) and "ContainerInfoVecRFileInfo" in result:
             container_and_files: Any = result["ContainerInfoVecRFileInfo"]
             _container_info, file_list = container_and_files
-            return [
-                f["path"] for f in file_list
-                if isinstance(f, dict) and f.get("path", "").startswith("script/")
-            ]
+            return [f["path"] for f in file_list if isinstance(f, dict) and f.get("path", "").startswith("script/")]
         raise RPFMError(f"Unexpected response from GetPackFileDataForTreeView: {result}")
 
     async def extract_packed_files(self, pack_handle: str, paths: list[str], dest_path: str) -> None:
@@ -169,10 +159,7 @@ class RPFMClient:
         await self.send_command("SavePack", pack_handle)
 
     async def add_packed_file(self, pack_handle: str, source_path: str, dest_path: str) -> None:
-        result = await self.send_command(
-            "AddPackedFiles",
-            [pack_handle, [source_path], [{"File": dest_path}], None]
-        )
+        result = await self.send_command("AddPackedFiles", [pack_handle, [source_path], [{"File": dest_path}], None])
         if isinstance(result, dict) and "VecContainerPathOptionString" in result:
             paths_and_error: Any = result["VecContainerPathOptionString"]
             _added_paths, error_message = paths_and_error
@@ -201,8 +188,8 @@ class RPFMConnection:
 
     async def __aexit__(
         self,
-        exc_type: Optional[type[BaseException]],
-        exc_val: Optional[BaseException],
-        exc_tb: Optional[types.TracebackType],
+        exc_type: type[BaseException] | None,
+        exc_val: BaseException | None,
+        exc_tb: types.TracebackType | None,
     ) -> None:
         await self.client.disconnect()

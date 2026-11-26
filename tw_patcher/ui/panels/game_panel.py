@@ -1,14 +1,13 @@
 from PyQt6.QtCore import Qt
-from PyQt6.QtGui import QPixmap, QFont
-from PyQt6.QtWidgets import QHBoxLayout, QVBoxLayout, QLabel, QPushButton, QDialog
+from PyQt6.QtGui import QFont, QPixmap
+from PyQt6.QtWidgets import QDialog, QHBoxLayout, QLabel, QPushButton, QVBoxLayout
 
 from ...config import settings
 from ...models.game import GAMES
-from ..state import AppState
-from ..panels import BasePanel
 from ..dialogs import GameBrowserDialog
+from ..panels import BasePanel
+from ..state import AppState
 from ..workers import ArtworkLoader
-
 
 HEADER_WIDTH = 460
 HEADER_HEIGHT = 215
@@ -26,9 +25,7 @@ class GamePanel(BasePanel):
         self._image_label = QLabel()
         self._image_label.setFixedSize(DISPLAY_WIDTH, DISPLAY_HEIGHT)
         self._image_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        self._image_label.setStyleSheet(
-            "background-color: #1a1a1a; border: 1px solid #444; border-radius: 6px;"
-        )
+        self._image_label.setStyleSheet("background-color: #1a1a1a; border: 1px solid #444; border-radius: 6px;")
         self._image_label.setText("No game selected")
         layout.addWidget(self._image_label)
 
@@ -91,12 +88,11 @@ class GamePanel(BasePanel):
     def _on_artwork_ready(self, game_key: str, pixmap: QPixmap) -> None:
         if game_key == settings.selected_game:
             from PyQt6.QtCore import QSize
+
             scaled = pixmap.scaled(
                 QSize(DISPLAY_WIDTH, DISPLAY_HEIGHT),
                 Qt.AspectRatioMode.KeepAspectRatio,
                 Qt.TransformationMode.SmoothTransformation,
             )
             self._image_label.setPixmap(scaled)
-            self._image_label.setStyleSheet(
-                "border: 1px solid #444; border-radius: 6px;"
-            )
+            self._image_label.setStyleSheet("border: 1px solid #444; border-radius: 6px;")

@@ -2,13 +2,21 @@ import shutil
 from pathlib import Path
 
 from PyQt6.QtWidgets import (
-    QVBoxLayout, QHBoxLayout, QLabel, QPushButton, QComboBox,
-    QLineEdit, QFileDialog, QMessageBox, QProgressBar, QInputDialog,
+    QComboBox,
+    QFileDialog,
+    QHBoxLayout,
+    QInputDialog,
+    QLabel,
+    QLineEdit,
+    QMessageBox,
+    QProgressBar,
+    QPushButton,
+    QVBoxLayout,
 )
 
 from ...config import settings
-from ..state import AppState
 from ..panels import BasePanel
+from ..state import AppState
 from ..workers import RepackWorker
 
 
@@ -94,7 +102,7 @@ class RepackPanel(BasePanel):
     def _new_patch_mod(self) -> None:
         name, ok = QInputDialog.getText(self, "New Patch Mod", "Patch mod name:")
         if ok and name.strip():
-            name = name.strip().replace(' ', '_')
+            name = name.strip().replace(" ", "_")
             patch_path = settings.get_patch_mod_path(name)
             if patch_path.exists():
                 QMessageBox.warning(self, "Exists", f"Patch mod '{name}' already exists.")
@@ -115,7 +123,8 @@ class RepackPanel(BasePanel):
             return
 
         reply = QMessageBox.question(
-            self, "Delete Patch Mod",
+            self,
+            "Delete Patch Mod",
             f"Permanently delete '{patch_name}' and all its contents?",
             QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
         )
@@ -133,9 +142,7 @@ class RepackPanel(BasePanel):
         self.refresh_patch_mods()
 
     def _browse_output_dir(self) -> None:
-        dir_path = QFileDialog.getExistingDirectory(
-            self, "Select Output Directory", str(settings.output_dir)
-        )
+        dir_path = QFileDialog.getExistingDirectory(self, "Select Output Directory", str(settings.output_dir))
         if dir_path:
             self.output_dir_edit.setText(dir_path)
 

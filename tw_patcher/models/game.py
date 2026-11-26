@@ -18,9 +18,11 @@ class GameDef:
 
 GAMES: dict[str, GameDef] = {}
 
+
 def _register(*defs: GameDef) -> None:
     for g in defs:
         GAMES[g.key] = g
+
 
 _register(
     GameDef("pharaoh_dynasties", "Pharaoh Dynasties", 2951630, "Total War PHARAOH DYNASTIES", "Pharaoh.exe"),
@@ -30,7 +32,13 @@ _register(
     GameDef("three_kingdoms", "Three Kingdoms", 779340, "Total War THREE KINGDOMS", "ThreeKingdoms.exe"),
     GameDef("warhammer_2", "Warhammer 2", 594570, "Total War WARHAMMER II", "TotalWarhammer2.exe"),
     GameDef("warhammer", "Warhammer", 364360, "Total War WARHAMMER", "TotalWarhammer.exe"),
-    GameDef("thrones_of_britannia", "Thrones of Britannia", 712100, "Total War Saga Thrones of Britannia", "ThronesOfBritannia.exe"),
+    GameDef(
+        "thrones_of_britannia",
+        "Thrones of Britannia",
+        712100,
+        "Total War Saga Thrones of Britannia",
+        "ThronesOfBritannia.exe",
+    ),
     GameDef("attila", "Attila", 325610, "Total War Attila", "Attila.exe"),
     GameDef("rome_2", "Rome 2", 214950, "Total War Rome II", "Rome2.exe"),
     GameDef("shogun_2", "Shogun 2", 34330, "Total War SHOGUN 2", "Shogun2.exe"),

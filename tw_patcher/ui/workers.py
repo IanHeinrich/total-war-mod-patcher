@@ -1,12 +1,11 @@
 import asyncio
 import traceback
 from pathlib import Path
-from typing import Optional
 
 from PyQt6.QtCore import QThread, pyqtSignal
 
 from ..clients.rpfm import RPFMClient
-from ..clients.steam import SteamWorkshopClient, WorkshopDetails
+from ..clients.steam import SteamWorkshopClient
 from ..config import settings
 from ..services.extraction import ExtractionService
 from ..services.repacking import RepackingService
@@ -17,13 +16,14 @@ class ExtractWorker(QThread):
     finished = pyqtSignal(bool, str)
     progress = pyqtSignal(str)
 
-    def __init__(self, sources: list[str], output: Optional[str] = None):
+    def __init__(self, sources: list[str], output: str | None = None):
         super().__init__()
         self.sources = sources
         self.output = output
 
     def run(self) -> None:
         try:
+
             async def _run():
                 system = SystemService(settings)
                 client = RPFMClient(settings.rpfm_host, settings.rpfm_port, settings.rpfm_timeout)
@@ -49,7 +49,7 @@ class RepackWorker(QThread):
     finished = pyqtSignal(bool, str)
     progress = pyqtSignal(str)
 
-    def __init__(self, patch_name: str, output: Optional[str] = None, name: Optional[str] = None):
+    def __init__(self, patch_name: str, output: str | None = None, name: str | None = None):
         super().__init__()
         self.patch_name = patch_name
         self.output = output
@@ -57,6 +57,7 @@ class RepackWorker(QThread):
 
     def run(self) -> None:
         try:
+
             async def _run():
                 system = SystemService(settings)
                 client = RPFMClient(settings.rpfm_host, settings.rpfm_port, settings.rpfm_timeout)

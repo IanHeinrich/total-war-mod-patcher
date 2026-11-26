@@ -1,11 +1,11 @@
-from PyQt6.QtWidgets import QMainWindow, QWidget, QVBoxLayout, QGroupBox
+from PyQt6.QtWidgets import QGroupBox, QMainWindow, QVBoxLayout, QWidget
 
 from ..config import settings
-from .state import AppState
-from .panels.game_panel import GamePanel
-from .panels.settings_panel import SettingsPanel
 from .panels.extract_panel import ExtractPanel
+from .panels.game_panel import GamePanel
 from .panels.repack_panel import RepackPanel
+from .panels.settings_panel import SettingsPanel
+from .state import AppState
 from .widgets import LogViewer
 
 

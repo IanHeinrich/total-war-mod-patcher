@@ -1,8 +1,8 @@
-from PyQt6.QtCore import Qt, QSize
-from PyQt6.QtGui import QPixmap, QFont
-from PyQt6.QtWidgets import QWidget, QHBoxLayout, QVBoxLayout, QLabel, QCheckBox
+from PyQt6.QtCore import QSize, Qt
+from PyQt6.QtGui import QFont, QPixmap
+from PyQt6.QtWidgets import QCheckBox, QHBoxLayout, QLabel, QVBoxLayout, QWidget
 
-from ..styles import THUMB_PLACEHOLDER, MUTED_TEXT, DIM_TEXT
+from ..styles import DIM_TEXT, MUTED_TEXT, THUMB_PLACEHOLDER
 
 THUMB_SIZE = 64
 

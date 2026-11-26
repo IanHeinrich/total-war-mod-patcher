@@ -1,19 +1,20 @@
+from collections.abc import Generator
 from contextlib import contextmanager
-from typing import Generator
 
 from rich.console import Console as RichConsole
 from rich.theme import Theme
 
-
-_theme = Theme({
-    "error": "bold red",
-    "warning": "yellow",
-    "success": "bold green",
-    "info": "dim",
-    "header": "bold",
-    "hint": "dim italic",
-    "item": "default",
-})
+_theme = Theme(
+    {
+        "error": "bold red",
+        "warning": "yellow",
+        "success": "bold green",
+        "info": "dim",
+        "header": "bold",
+        "hint": "dim italic",
+        "item": "default",
+    }
+)
 
 
 class Console:

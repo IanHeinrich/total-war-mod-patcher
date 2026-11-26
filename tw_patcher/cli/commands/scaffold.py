@@ -10,10 +10,11 @@ from ..main import cli
 
 @cli.command()
 @click.option(
-    '--target', '-t',
+    "--target",
+    "-t",
     type=click.Path(file_okay=False, path_type=Path),
     default=None,
-    help='Target directory to scaffold (default: modding workspace root)'
+    help="Target directory to scaffold (default: modding workspace root)",
 )
 def scaffold(target: Path | None) -> None:
     """Generate modding docs and AI helper files in the workspace."""

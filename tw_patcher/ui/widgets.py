@@ -1,12 +1,12 @@
 from __future__ import annotations
 
-import urllib.request
 import urllib.error
+import urllib.request
 from pathlib import Path
 
-from PyQt6.QtCore import Qt, QSize, QThread, pyqtSignal, QObject
-from PyQt6.QtGui import QPixmap, QFont
-from PyQt6.QtWidgets import QWidget, QHBoxLayout, QVBoxLayout, QLabel, QCheckBox
+from PyQt6.QtCore import QObject, QSize, Qt, QThread, pyqtSignal
+from PyQt6.QtGui import QFont, QPixmap
+from PyQt6.QtWidgets import QCheckBox, QHBoxLayout, QLabel, QVBoxLayout, QWidget
 
 from ..constants import THUMBNAIL_TIMEOUT
 

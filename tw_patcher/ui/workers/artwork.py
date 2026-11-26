@@ -1,5 +1,5 @@
-import urllib.request
 import urllib.error
+import urllib.request
 from pathlib import Path
 
 from PyQt6.QtCore import QThread, pyqtSignal

@@ -10,25 +10,28 @@ from .._helpers import create_client, create_system_service, require_game
 from ..main import cli
 
 
-@cli.command('replace-table')
+@cli.command("replace-table")
 @click.option(
-    '--pack', '-p',
+    "--pack",
+    "-p",
     required=True,
     type=click.Path(exists=True, dir_okay=False, path_type=Path),
-    help='.pack file containing the table to replace'
+    help=".pack file containing the table to replace",
 )
 @click.option(
-    '--tsv', '-t',
+    "--tsv",
+    "-t",
     required=True,
     multiple=True,
     type=click.Path(exists=True, dir_okay=False, path_type=Path),
-    help='Replacement TSV file(s) — must match a table already in the pack'
+    help="Replacement TSV file(s) — must match a table already in the pack",
 )
 @click.option(
-    '--output', '-o',
+    "--output",
+    "-o",
     type=click.Path(dir_okay=False, path_type=Path),
     default=None,
-    help='Write to a new file instead of editing the pack in-place'
+    help="Write to a new file instead of editing the pack in-place",
 )
 def replace_table(pack: Path, tsv: tuple[Path, ...], output: Path | None) -> None:
     """Swap one or more DB tables inside a .pack file, keeping all other content intact.
@@ -50,13 +53,13 @@ def replace_table(pack: Path, tsv: tuple[Path, ...], output: Path | None) -> Non
         output.parent.mkdir(parents=True, exist_ok=True)
 
     def _read_table_path(tsv_path: Path) -> str:
-        with open(tsv_path, 'r', encoding='utf-8') as f:
+        with open(tsv_path, encoding="utf-8") as f:
             _header = f.readline()
             metadata = f.readline().strip()
-        if not metadata.startswith('#'):
+        if not metadata.startswith("#"):
             console.error(f"Invalid TSV metadata in {tsv_path.name}: line 2 must start with '#'")
             sys.exit(1)
-        parts = metadata.lstrip('#').split(';')
+        parts = metadata.lstrip("#").split(";")
         if len(parts) < 3:
             console.error(f"Invalid TSV metadata in {tsv_path.name}: expected 3 semicolon-separated fields")
             sys.exit(1)
@@ -69,6 +72,7 @@ def replace_table(pack: Path, tsv: tuple[Path, ...], output: Path | None) -> Non
         console.info(f"  {tsv_path.name} → {table_path}")
 
     try:
+
         async def _run():
             from ...utils.rpfm_utils import normalize_rpfm_path
 
@@ -79,9 +83,7 @@ def replace_table(pack: Path, tsv: tuple[Path, ...], output: Path | None) -> Non
                 await client.set_game_selected(settings.selected_game)  # type: ignore[arg-type]
 
                 with console.status("Opening pack file..."):
-                    pack_handle = await client.open_pack_file(
-                        normalize_rpfm_path(pack)
-                    )
+                    pack_handle = await client.open_pack_file(normalize_rpfm_path(pack))
 
                 for tsv_path, table_path in table_entries:
                     with console.status(f"Replacing {table_path}..."):

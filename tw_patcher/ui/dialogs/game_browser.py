@@ -1,18 +1,25 @@
 from pathlib import Path
 
-from PyQt6.QtCore import Qt, QSize
+from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QPixmap
 from PyQt6.QtWidgets import (
-    QDialog, QVBoxLayout, QHBoxLayout, QLabel, QPushButton,
-    QScrollArea, QWidget, QGridLayout, QFileDialog, QMessageBox,
+    QDialog,
     QDialogButtonBox,
+    QFileDialog,
+    QGridLayout,
+    QHBoxLayout,
+    QLabel,
+    QMessageBox,
+    QPushButton,
+    QScrollArea,
+    QVBoxLayout,
+    QWidget,
 )
 
 from ...config import settings
-from ...models.game import GAMES, GAME_KEYS, GameDef
+from ...models.game import GAME_KEYS, GAMES
 from ..widgets import GameCard
 from ..workers import ArtworkLoader
-
 
 GRID_COLUMNS = 3
 
@@ -111,18 +118,16 @@ class GameBrowserDialog(QDialog):
             self._cards[game_key].set_image(pixmap)
 
     def _manual_select(self) -> None:
-        dir_path = QFileDialog.getExistingDirectory(
-            self, "Select Total War Game Install Folder", ""
-        )
+        dir_path = QFileDialog.getExistingDirectory(self, "Select Total War Game Install Folder", "")
         if not dir_path:
             return
 
         path = Path(dir_path)
         if not (path / "data").is_dir():
             QMessageBox.warning(
-                self, "Invalid Folder",
-                "Selected folder doesn't appear to be a Total War install "
-                "(no 'data' subfolder found)."
+                self,
+                "Invalid Folder",
+                "Selected folder doesn't appear to be a Total War install (no 'data' subfolder found).",
             )
             return
 
@@ -136,11 +141,10 @@ class GameBrowserDialog(QDialog):
         if not matched_key:
             # Ask user to pick from full list
             from PyQt6.QtWidgets import QInputDialog
+
             names = [f"{GAMES[k].display_name} ({k})" for k in GAME_KEYS]
             chosen, ok = QInputDialog.getItem(
-                self, "Which Game?",
-                "Could not auto-detect the game. Please select:",
-                names, 0, False
+                self, "Which Game?", "Could not auto-detect the game. Please select:", names, 0, False
             )
             if not ok:
                 return

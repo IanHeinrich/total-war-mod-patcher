@@ -1,7 +1,6 @@
 import asyncio
 import traceback
 from pathlib import Path
-from typing import Optional
 
 from PyQt6.QtCore import QThread, pyqtSignal
 
@@ -15,7 +14,7 @@ class RepackWorker(QThread):
     finished = pyqtSignal(bool, str)
     progress = pyqtSignal(str)
 
-    def __init__(self, patch_name: str, output: Optional[str] = None, name: Optional[str] = None):
+    def __init__(self, patch_name: str, output: str | None = None, name: str | None = None):
         super().__init__()
         self.patch_name = patch_name
         self.output = output
@@ -23,6 +22,7 @@ class RepackWorker(QThread):
 
     def run(self) -> None:
         try:
+
             async def _run():
                 system = SystemService(settings)
                 client = RPFMClient(settings.rpfm_host, settings.rpfm_port, settings.rpfm_timeout)
@@ -41,7 +41,7 @@ class RepackWorker(QThread):
                 True,
                 f"Repacked '{self.patch_name}': "
                 f"{len(result.tables_imported)} tables, "
-                f"{len(result.scripts_imported)} scripts -> {result.output_path}"
+                f"{len(result.scripts_imported)} scripts -> {result.output_path}",
             )
         except Exception as e:
             self.finished.emit(False, f"Repacking failed: {e}\n{traceback.format_exc()}")
