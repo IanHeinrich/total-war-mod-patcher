@@ -59,7 +59,7 @@ a = Analysis(
         "tw_patcher.data.tsv",
         "tw_patcher.mcp_server",
         # The MCP SDK loads parts of itself dynamically
-        *collect_submodules("mcp"),
+        *collect_submodules("mcp", filter=lambda name: not name.startswith("mcp.cli")),  # mcp.cli needs typer
         *collect_submodules("mcp_types"),
         "tw_patcher.ui",
         "tw_patcher.ui.app",
