@@ -1,26 +1,26 @@
 """
 WebSocket client for RPFM headless server.
 
-Protocol uses externally-tagged serde enums:
-  Send:    {"id": <u64>, "data": {"CommandName": params}}
-  Receive: {"id": <u64>, "data": <Response>}
-
-On connect the server sends: {"id": 0, "data": {"SessionConnected": <session_id>}}
+Speaks both the legacy command protocol and the JSON-RPC 2.0 protocol of newer
+RPFM releases (see ``rpfm_protocols``); which one is chosen from the server's
+first frame at connect time and exposed as ``client.protocol``.
 """
 
 import asyncio
 import json
 import logging
 import types
-from typing import Any
+import urllib.request
 
 import websockets
 from websockets import ClientConnection
 
 from ..constants import RPFM_DEFAULT_PORT, RPFM_DEFAULT_TIMEOUT, RPFM_WS_MAX_SIZE
-from ..exceptions import RPFMError
+from .rpfm_protocols import LEGACY, JsonRpcProtocol, LegacyProtocol, RPFMProtocol, detect_protocol
 
 logger = logging.getLogger(__name__)
+
+VERSION_TIMEOUT = 2  # seconds; the /version lookup is best effort
 
 
 class RPFMClient:
@@ -31,7 +31,13 @@ class RPFMClient:
         self.ws_url = f"ws://{host}:{port}/ws"
         self.connection: ClientConnection | None = None
         self.session_id: int | None = None
-        self._message_id = 0
+        self.server_version: str | None = None
+        self._protocol: RPFMProtocol | None = None
+
+    @property
+    def protocol(self) -> str | None:
+        """``"legacy"`` or ``"jsonrpc"`` once connected, else None."""
+        return self._protocol.name if self._protocol else None
 
     async def connect(self) -> None:
         try:
@@ -41,141 +47,100 @@ class RPFMClient:
             )
             raw = await asyncio.wait_for(self.connection.recv(), timeout=self.timeout)
             msg = json.loads(raw)
-            data = msg.get("data")
-            if isinstance(data, dict) and "SessionConnected" in data:
-                self.session_id = data["SessionConnected"]
-                logger.info(f"Connected to RPFM server (session_id={self.session_id})")
-            else:
+            protocol, self.session_id = detect_protocol(msg)
+            if protocol is None:
                 logger.warning(f"Unexpected first message from RPFM server: {msg}")
+                protocol = LEGACY
+            if protocol == LEGACY:
+                self._protocol = LegacyProtocol(self.connection, self.timeout)
+            else:
+                self._protocol = JsonRpcProtocol(self.connection, self.timeout)
+                self.server_version = await asyncio.to_thread(self._fetch_server_version)
+            logger.info(f"Connected to RPFM server (protocol={protocol}, session_id={self.session_id})")
         except asyncio.TimeoutError:
             raise ConnectionError(f"Timed out connecting to RPFM server ({self.timeout}s)") from None
         except Exception as e:
             raise ConnectionError(f"Failed to connect to RPFM server: {e}") from e
 
+    def _fetch_server_version(self) -> str | None:
+        """GET /version (response shape undocumented): a "version" field if JSON, else the raw body. Never raises."""
+        try:
+            opener = urllib.request.build_opener(urllib.request.ProxyHandler({}))
+            with opener.open(f"http://{self.host}:{self.port}/version", timeout=VERSION_TIMEOUT) as response:
+                body = response.read(4096).decode("utf-8", errors="replace").strip()
+        except Exception as e:
+            logger.debug(f"Could not read RPFM server version: {e}")
+            return None
+        try:
+            data = json.loads(body)
+        except ValueError:
+            data = body
+        if isinstance(data, dict):
+            data = data.get("version") or data.get("server_version")
+        if isinstance(data, (str, int, float)) and str(data).strip():
+            text = str(data).strip()
+            return text if len(text) <= 100 and "\n" not in text else None
+        return None
+
     async def disconnect(self) -> None:
         if self.connection:
-            try:
-                await self._send_notify("ClientDisconnecting")
-            except Exception:
-                pass
+            if self._protocol:
+                try:
+                    await self._protocol.goodbye()
+                except Exception:
+                    pass
             await self.connection.close()
             logger.info("Disconnected from RPFM server")
 
-    def _next_id(self) -> int:
-        self._message_id += 1
-        return self._message_id
-
-    async def _send_notify(self, command: str) -> None:
-        if not self.connection:
+    @property
+    def _proto(self) -> RPFMProtocol:
+        if not self._protocol:
             raise RuntimeError("Not connected to RPFM server")
-        message: dict[str, Any] = {"id": self._next_id(), "data": command}
-        await self.connection.send(json.dumps(message))
-
-    async def send_command(self, command: str, params: Any = None) -> Any:
-        if not self.connection:
-            raise RuntimeError("Not connected to RPFM server")
-
-        message_id = self._next_id()
-
-        if params is None:
-            data: Any = command
-        else:
-            data = {command: params}
-
-        message: dict[str, Any] = {"id": message_id, "data": data}
-
-        try:
-            logger.debug(f"-> {command} (id={message_id})")
-            await self.connection.send(json.dumps(message))
-
-            while True:
-                raw = await asyncio.wait_for(self.connection.recv(), timeout=self.timeout)
-                response = json.loads(raw)
-                if response.get("id") == message_id:
-                    break
-                logger.debug(f"Discarding message with id={response.get('id')}")
-
-            resp_data = response.get("data")
-
-            if isinstance(resp_data, dict) and "Error" in resp_data:
-                raise RPFMError(resp_data["Error"])
-
-            logger.debug(f"<- {command} OK")
-            return resp_data
-
-        except RPFMError:
-            raise
-        except asyncio.TimeoutError:
-            raise TimeoutError(f"Command '{command}' timed out after {self.timeout}s") from None
-        except Exception as e:
-            raise RuntimeError(f"Error executing '{command}': {e}") from e
+        return self._protocol
 
     async def set_game_selected(self, game_key: str) -> None:
-        await self.send_command("SetGameSelected", [game_key, False])
+        await self._proto.set_game_selected(game_key)
         logger.info(f"Game set to: {game_key}")
 
     async def open_pack_file(self, pack_path: str) -> str:
-        result = await self.send_command("OpenPackFiles", [pack_path])
-        if isinstance(result, dict) and "StringContainerInfo" in result:
-            handle_and_info: Any = result["StringContainerInfo"]
-            return str(handle_and_info[0])
-        raise RPFMError(f"Unexpected response from OpenPackFiles: {result}")
+        return await self._proto.open_pack_file(pack_path)
 
     async def close_pack_file(self, pack_handle: str) -> None:
-        await self.send_command("ClosePack", pack_handle)
+        await self._proto.close_pack_file(pack_handle)
+
+    async def list_paths(self, pack_handle: str) -> list[str]:
+        """Every file path in the pack, fetched once (callers filter by prefix)."""
+        return await self._proto.list_paths(pack_handle)
 
     async def list_db_table_paths(self, pack_handle: str) -> list[str]:
-        result = await self.send_command("GetPackFileDataForTreeView", pack_handle)
-        if isinstance(result, dict) and "ContainerInfoVecRFileInfo" in result:
-            container_and_files: Any = result["ContainerInfoVecRFileInfo"]
-            _container_info, file_list = container_and_files
-            return [f["path"] for f in file_list if isinstance(f, dict) and f.get("path", "").startswith("db/")]
-        raise RPFMError(f"Unexpected response from GetPackFileDataForTreeView: {result}")
+        return [p for p in await self.list_paths(pack_handle) if p.startswith("db/")]
 
     async def list_script_paths(self, pack_handle: str) -> list[str]:
-        result = await self.send_command("GetPackFileDataForTreeView", pack_handle)
-        if isinstance(result, dict) and "ContainerInfoVecRFileInfo" in result:
-            container_and_files: Any = result["ContainerInfoVecRFileInfo"]
-            _container_info, file_list = container_and_files
-            return [f["path"] for f in file_list if isinstance(f, dict) and f.get("path", "").startswith("script/")]
-        raise RPFMError(f"Unexpected response from GetPackFileDataForTreeView: {result}")
+        return [p for p in await self.list_paths(pack_handle) if p.startswith("script/")]
 
     async def extract_packed_files(self, pack_handle: str, paths: list[str], dest_path: str) -> None:
-        container_paths = [{"File": p} for p in paths]
-        sources = {"PackFile": container_paths}
-        await self.send_command("ExtractPackedFiles", [pack_handle, sources, dest_path, False])
+        await self._proto.extract_packed_files(pack_handle, paths, dest_path)
 
     async def export_tsv(self, pack_handle: str, table_path: str, output_path: str) -> None:
-        await self.send_command("ExportTSV", [pack_handle, table_path, output_path, "PackFile"])
+        await self._proto.export_tsv(pack_handle, table_path, output_path)
 
     async def import_tsv(self, pack_handle: str, table_path: str, tsv_path: str) -> None:
-        await self.send_command("ImportTSV", [pack_handle, table_path, tsv_path])
+        await self._proto.import_tsv(pack_handle, table_path, tsv_path)
 
     async def delete_packed_files(self, pack_handle: str, paths: list[str]) -> None:
-        container_paths = [{"File": p} for p in paths]
-        await self.send_command("DeletePackedFiles", [pack_handle, container_paths])
+        await self._proto.delete_packed_files(pack_handle, paths)
 
     async def save_pack(self, pack_handle: str) -> None:
-        await self.send_command("SavePack", pack_handle)
+        await self._proto.save_pack(pack_handle)
 
     async def add_packed_file(self, pack_handle: str, source_path: str, dest_path: str) -> None:
-        result = await self.send_command("AddPackedFiles", [pack_handle, [source_path], [{"File": dest_path}], None])
-        if isinstance(result, dict) and "VecContainerPathOptionString" in result:
-            paths_and_error: Any = result["VecContainerPathOptionString"]
-            _added_paths, error_message = paths_and_error
-            if error_message:
-                raise RPFMError(str(error_message))
-            return
-        raise RPFMError(f"Unexpected response from AddPackedFiles: {result}")
+        await self._proto.add_packed_file(pack_handle, source_path, dest_path)
 
     async def new_pack(self) -> str:
-        result = await self.send_command("NewPack")
-        if isinstance(result, dict) and "String" in result:
-            return str(result["String"])
-        raise RPFMError(f"Unexpected response from NewPack: {result}")
+        return await self._proto.new_pack()
 
     async def save_pack_as(self, pack_handle: str, output_path: str) -> None:
-        await self.send_command("SavePackAs", [pack_handle, output_path])
+        await self._proto.save_pack_as(pack_handle, output_path)
 
 
 class RPFMConnection:

@@ -78,9 +78,10 @@ class Workspace:
         return path
 
 
-@pytest.fixture
-def rpfm() -> Iterator[FakeRPFM]:
-    server = FakeRPFM().start()
+@pytest.fixture(params=["legacy", "jsonrpc"], ids=["rpfm-legacy", "rpfm-jsonrpc"])
+def rpfm(request: pytest.FixtureRequest) -> Iterator[FakeRPFM]:
+    """A fake RPFM server; every test using it runs once per server protocol."""
+    server = FakeRPFM(dialect=request.param).start()
     yield server
     server.stop()
 

@@ -7,6 +7,11 @@ from ...models.game import GAMES
 from .._helpers import create_client, create_system_service
 from ..main import cli
 
+PROTOCOL_NAMES = {
+    "legacy": "legacy WebSocket commands (RPFM 4.x)",
+    "jsonrpc": "JSON-RPC 2.0 (RPFM 5.x)",
+}
+
 
 @cli.command()
 def check() -> None:
@@ -24,8 +29,12 @@ def check() -> None:
         async def _run():
             client = create_client()
             await system.connect_client(client)
+            protocol, version = client.protocol, client.server_version
             await client.disconnect()
             console.success("RPFM server connectivity OK")
+            console.item(f"RPFM protocol: {PROTOCOL_NAMES.get(protocol or '', protocol)}")
+            if version:
+                console.item(f"RPFM server version: {version}")
 
         asyncio.run(_run())
         console.success("All checks passed!")

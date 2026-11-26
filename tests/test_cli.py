@@ -228,9 +228,185 @@ def test_clean_empties_sources_and_output_but_not_workspace(ws: Workspace) -> No
     ws.write("output/old.pack", "{}")
     patch = ws.write("workspace/my_patch/db/units_tables/x.tsv", UNITS)
 
-    result = ws.run("clean")
+    result = ws.run("clean", "--yes")
 
     assert result.exit_code == 0, result.output
     assert list(ws.sources.iterdir()) == []
     assert list(ws.output.iterdir()) == []
     assert patch.exists()
+
+
+# ---------------------------------------------------------------------- failure handling and safety
+
+
+def test_extract_partial_failure_lists_failures_and_exits_nonzero(ws: Workspace, rpfm: FakeRPFM) -> None:
+    pack = make_source_pack(ws)
+    rpfm.fail("ExportTSV", "factions_tables", "unsupported table version")
+
+    result = ws.run("extract", "-s", str(pack))
+
+    assert result.exit_code == 1
+    assert "db/factions_tables/mod_a: unsupported table version" in result.stderr
+    assert (ws.sources / "mod_a/db/units_tables/mod_a.tsv").exists(), "successful tables are still written"
+    assert rpfm.open_handles == []
+
+
+def test_extract_closes_pack_when_listing_fails(ws: Workspace, rpfm: FakeRPFM) -> None:
+    pack = make_source_pack(ws)
+    rpfm.fail("GetPackFileDataForTreeView")
+
+    result = ws.run("extract", "-s", str(pack))
+
+    assert result.exit_code == 1
+    assert "Extraction failed" in result.stderr
+    assert rpfm.open_handles == []
+
+
+def test_extract_dry_run_writes_nothing(ws: Workspace) -> None:
+    pack = make_source_pack(ws)
+    existing = ws.write("sources/mod_a/db/old_tables/keep.tsv", "old")
+
+    result = ws.run("extract", "-s", str(pack), "--dry-run")
+
+    assert result.exit_code == 0, result.output
+    assert "mod_a.pack" in result.stdout
+    assert "2 tables, 1 scripts" in result.stdout
+    assert "replaces existing folder" in result.stdout
+    assert existing.exists()
+    assert not (ws.sources / "mod_a/db/units_tables").exists()
+
+
+def test_extract_refuses_packs_that_map_to_the_same_folder(ws: Workspace) -> None:
+    first = make_source_pack(ws, "my-mod.pack")
+    second = make_source_pack(ws, "my_mod.pack")
+
+    result = ws.run("extract", "-s", str(first), "-s", str(second))
+
+    assert result.exit_code == 1
+    assert "would both extract to sources/my_mod/" in result.stderr
+    assert not (ws.sources / "my_mod").exists()
+
+
+def test_repack_does_not_save_a_partial_pack(ws: Workspace, rpfm: FakeRPFM) -> None:
+    ws.write("workspace/my_patch/db/units_tables/my_patch.tsv", UNITS)
+    ws.write("workspace/my_patch/db/factions_tables/my_patch.tsv", FACTIONS)
+    rpfm.fail("AddPackedFiles", "factions_tables", "bad column count")
+
+    result = ws.run("repack", "--patch", "my_patch")
+
+    assert result.exit_code == 1
+    assert "db/factions_tables/my_patch: bad column count" in result.stderr
+    assert "--allow-partial" in result.stderr
+    assert not (ws.output / "my_patch.pack").exists()
+    assert rpfm.open_handles == []
+
+
+def test_repack_allow_partial_saves_what_imported(ws: Workspace, rpfm: FakeRPFM) -> None:
+    ws.write("workspace/my_patch/db/units_tables/my_patch.tsv", UNITS)
+    ws.write("workspace/my_patch/db/factions_tables/my_patch.tsv", FACTIONS)
+    rpfm.fail("AddPackedFiles", "factions_tables", "bad column count")
+
+    result = ws.run("repack", "--patch", "my_patch", "--allow-partial")
+
+    assert result.exit_code == 1, "partial success is still reported as a failure"
+    assert "Partial pack saved" in result.stderr
+    assert read_pack(ws.output / "my_patch.pack") == {"db/units_tables/my_patch": UNITS}
+
+
+def test_repack_closes_its_pack(ws: Workspace, rpfm: FakeRPFM) -> None:
+    ws.write("workspace/my_patch/db/units_tables/my_patch.tsv", UNITS)
+
+    result = ws.run("repack", "--patch", "my_patch")
+
+    assert result.exit_code == 0, result.output
+    assert rpfm.open_handles == []
+
+
+def test_repack_rejects_patch_names_that_escape_a_custom_workspace(ws: Workspace) -> None:
+    ws.write("workspace/my_patch/db/units_tables/my_patch.tsv", UNITS)
+    ws.write("sources/secret/db/units_tables/x.tsv", UNITS)
+
+    result = ws.run("repack", "--patch", "../sources/secret", "--workspace-dir", str(ws.workspace))
+
+    assert result.exit_code == 1
+    assert "Invalid patch mod name" in result.stderr
+    assert not list(ws.output.glob("*.pack"))
+
+
+def test_replace_table_in_place_keeps_a_backup(ws: Workspace) -> None:
+    pack = make_source_pack(ws)
+    original = pack.read_bytes()
+    fixed = tsv("units_tables", "mod_a", ["key", "cost"], [["unit_a", "1"]])
+
+    result = ws.run("replace-table", "-p", str(pack), "-t", str(ws.write("fix.tsv", fixed)))
+
+    assert result.exit_code == 0, result.output
+    backup = pack.with_name("mod_a.pack.bak")
+    assert backup.read_bytes() == original
+    assert str(backup) in result.stdout
+
+
+def test_replace_table_no_backup(ws: Workspace) -> None:
+    pack = make_source_pack(ws)
+    fixed = tsv("units_tables", "mod_a", ["key", "cost"], [["unit_a", "1"]])
+
+    result = ws.run("replace-table", "-p", str(pack), "-t", str(ws.write("fix.tsv", fixed)), "--no-backup")
+
+    assert result.exit_code == 0, result.output
+    assert not pack.with_name("mod_a.pack.bak").exists()
+
+
+def test_replace_table_refuses_a_table_the_pack_does_not_have(ws: Workspace, rpfm: FakeRPFM) -> None:
+    pack = make_source_pack(ws)
+    original = read_pack(pack)
+    other = tsv("buildings_tables", "mod_a", ["key"], [["b"]])
+
+    result = ws.run("replace-table", "-p", str(pack), "-t", str(ws.write("fix.tsv", other)))
+
+    assert result.exit_code == 1
+    assert "Not in mod_a.pack: db/buildings_tables/mod_a" in result.stderr
+    assert read_pack(pack) == original
+    assert not pack.with_name("mod_a.pack.bak").exists()
+    assert rpfm.open_handles == []
+
+
+def test_clean_asks_before_deleting(ws: Workspace) -> None:
+    kept = ws.write("sources/mod_a/db/x.tsv", UNITS)
+
+    declined = ws.run("clean", input="n\n")
+    assert declined.exit_code == 1
+    assert "Nothing deleted" in declined.stderr
+    assert kept.exists()
+
+    accepted = ws.run("clean", input="y\n")
+    assert accepted.exit_code == 0, accepted.output
+    assert not kept.exists()
+
+
+def test_clean_without_a_terminal_needs_yes(ws: Workspace) -> None:
+    kept = ws.write("output/old.pack", "{}")
+
+    result = ws.run("clean", input="")
+
+    assert result.exit_code != 0
+    assert kept.exists()
+
+
+def test_clean_dry_run_lists_without_deleting(ws: Workspace) -> None:
+    kept = ws.write("sources/mod_a/db/x.tsv", UNITS)
+
+    result = ws.run("clean", "--dry-run")
+
+    assert result.exit_code == 0, result.output
+    assert "Would delete 1 item(s)" in result.stdout
+    assert "mod_a" in result.stdout
+    assert kept.exists()
+
+
+def test_verbose_shows_the_rpfm_protocol_trace(ws: Workspace) -> None:
+    pack = make_source_pack(ws)
+
+    result = ws.run("--verbose", "extract", "-s", str(pack))
+
+    assert result.exit_code == 0, result.output
+    assert "tw_patcher.clients" in result.stderr

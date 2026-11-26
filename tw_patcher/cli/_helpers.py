@@ -24,3 +24,14 @@ def require_game() -> None:
         for key, game in GAMES.items():
             console.item(f"  {key:25s} {game.display_name}")
         sys.exit(1)
+
+
+def report_failures(failures: list[tuple[str, str]], what: str, limit: int = 20) -> None:
+    """Print each failed item and its reason (capped), to stderr."""
+    if not failures:
+        return
+    console.error(f"{len(failures)} {what} failed:")
+    for path, reason in failures[:limit]:
+        console.error(f"  {path}: {reason}")
+    if len(failures) > limit:
+        console.error(f"  ... and {len(failures) - limit} more (run with --verbose for all)")
